@@ -1,11 +1,19 @@
 // T007: JSON file storage service for players.json and config.json
 import { promises as fs } from "fs";
 import { join } from "path";
-import { PlayersData, ConfigData, Player, LogProcessingState } from "./types";
+import {
+  PlayersData,
+  ConfigData,
+  Player,
+  LogProcessingState,
+  LeaderboardConfig,
+} from "./types";
+import { Logger } from "./logger";
 
 export class StorageService {
   private readonly playersFile = join(process.cwd(), "players.json");
   private readonly configFile = join(process.cwd(), "config.json");
+  private readonly logger = Logger.getInstance();
 
   // Player data management
   async loadPlayers(): Promise<PlayersData> {
@@ -13,20 +21,37 @@ export class StorageService {
       const data = await fs.readFile(this.playersFile, "utf-8");
       const parsed = JSON.parse(data) as PlayersData;
 
-      // Convert date strings back to Date objects
+      // Convert date strings back to Date objects and handle migration
       Object.values(parsed.players).forEach((player) => {
         player.firstSeen = new Date(player.firstSeen);
         player.lastUpdated = new Date(player.lastUpdated);
         if (player.lastDeathTimestamp) {
           player.lastDeathTimestamp = new Date(player.lastDeathTimestamp);
         }
+
+        // Migration: Add lastSeenTimestamp if missing
+        if (!player.lastSeenTimestamp) {
+          player.lastSeenTimestamp = player.lastUpdated;
+        } else {
+          player.lastSeenTimestamp = new Date(player.lastSeenTimestamp);
+        }
       });
+
+      // Update version if migration occurred
+      if (parsed.version !== "1.1.0") {
+        parsed.version = "1.1.0";
+        await this.savePlayers(parsed);
+      }
 
       return parsed;
     } catch (error) {
+      this.logger.warn(
+        "Failed to load players file, using empty structure:",
+        error
+      );
       // Return empty structure if file doesn't exist or is invalid
       return {
-        version: "1.0",
+        version: "1.1.0",
         lastUpdated: new Date().toISOString(),
         players: {},
       };
@@ -49,12 +74,14 @@ export class StorageService {
     const data = await this.loadPlayers();
 
     if (!data.players[username]) {
+      const now = new Date();
       data.players[username] = {
         username,
         totalDeaths: 0,
         lastDeathTimestamp: null,
-        firstSeen: new Date(),
-        lastUpdated: new Date(),
+        firstSeen: now,
+        lastUpdated: now,
+        lastSeenTimestamp: now,
       };
     }
 
@@ -78,6 +105,7 @@ export class StorageService {
       const data = await fs.readFile(this.configFile, "utf-8");
       return JSON.parse(data) as ConfigData;
     } catch (error) {
+      this.logger.warn("Failed to load config file:", error);
       return null;
     }
   }
@@ -96,6 +124,7 @@ export class StorageService {
       const config = await this.loadConfig();
       return config?.logState || null;
     } catch (error) {
+      this.logger.warn("Failed to get log state:", error);
       return null;
     }
   }
@@ -103,17 +132,79 @@ export class StorageService {
   async saveLogState(state: LogProcessingState): Promise<void> {
     try {
       let config = await this.loadConfig();
-      if (!config) {
-        // Create minimal config if it doesn't exist
-        config = {
-          discord: { channelId: "", guildId: "", enabled: true },
-        };
-      }
+      config ??= {
+        discord: { channelId: "", guildId: "", enabled: true },
+      };
 
       config.logState = state;
       await this.saveConfig(config);
     } catch (error) {
       console.error("Failed to save log state:", error);
+    }
+  }
+
+  // Leaderboard configuration management
+  async getLeaderboardConfig(): Promise<LeaderboardConfig | null> {
+    try {
+      const config = await this.loadConfig();
+      return config?.leaderboard || null;
+    } catch (error) {
+      this.logger.warn("Failed to get leaderboard config:", error);
+      return null;
+    }
+  }
+
+  async saveLeaderboardConfig(
+    leaderboardConfig: LeaderboardConfig
+  ): Promise<void> {
+    try {
+      let config = await this.loadConfig();
+      config ??= {
+        discord: { channelId: "", guildId: "", enabled: true },
+      };
+
+      config.leaderboard = leaderboardConfig;
+      await this.saveConfig(config);
+    } catch (error) {
+      this.logger.error("Failed to save leaderboard config:", error);
+    }
+  }
+
+  // Player activity tracking
+  async updatePlayerLastSeen(username: string): Promise<void> {
+    const data = await this.loadPlayers();
+
+    if (data.players[username]) {
+      data.players[username].lastSeenTimestamp = new Date();
+      data.players[username].lastUpdated = new Date();
+      await this.savePlayers(data);
+    }
+  }
+
+  // Configuration initialization and migration
+  async initializeConfig(): Promise<void> {
+    try {
+      let config = await this.loadConfig();
+
+      // Create default config if it doesn't exist
+      config ??= {
+        discord: { channelId: "", guildId: "", enabled: true },
+      };
+
+      // Initialize leaderboard config with defaults if missing
+      if (!config.leaderboard) {
+        config.leaderboard = {
+          enabled: true,
+          announcementTime: "09:00", // 9:00 AM
+          timezone: "EST",
+          lastAnnouncementDate: "1970-01-01", // Default to epoch date
+        };
+
+        this.logger.info("Initialized default leaderboard configuration");
+        await this.saveConfig(config);
+      }
+    } catch (error) {
+      this.logger.error("Failed to initialize configuration:", error);
     }
   }
 

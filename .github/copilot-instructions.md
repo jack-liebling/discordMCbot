@@ -14,20 +14,24 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 
 ## Architecture Principles
 
-- Single feature focus (death announcements only)
+- Single feature focus with planned leaderboard extension
 - Simple file-based data storage
 - Event-driven Discord bot architecture
 - Graceful error handling without crashes
 - 30-second rate limiting per player
 - Log position tracking to prevent duplicate announcements
+- Daily scheduled announcements at 11:59 PM EST
 
 ## Core Entities
 
 - **DeathEvent**: Player death with timestamp, cause, experience level
-- **Player**: Persistent death statistics and rate limiting data
+- **Player**: Persistent death statistics, rate limiting data, and activity tracking
+- **DailyLeaderboard**: Ranked player death counts with survival champion
+- **SurvivalChampion**: Longest-surviving active player (within 7 days)
 - **DiscordChannelConfig**: Channel settings for announcements
 - **FtpConfig**: FTP server connection details for log access
 - **LogProcessingState**: Tracks processed log positions across restarts
+- **LeaderboardConfig**: Daily announcement scheduling and state
 
 ## Key Implementation Notes
 
@@ -49,6 +53,9 @@ src/
 ├── storage.ts      # JSON file data persistence with log state tracking
 ├── playerTracker.ts # Player death statistics and rate limiting
 ├── announcer.ts    # Discord announcement service
+├── leaderboardService.ts # Daily leaderboard generation and scheduling
+├── leaderboardFormatter.ts # Discord embed formatting for leaderboards
+├── schedulerService.ts # Daily timing coordination for announcements
 ├── logger.ts       # Centralized logging service
 ├── config.ts       # Environment configuration loader
 └── types.ts        # TypeScript interfaces and types
@@ -64,6 +71,7 @@ src/
 - 2025-09-17: Implemented log position tracking to prevent duplicate announcements
 - 2025-09-17: Enhanced timezone handling and rate limiting accuracy
 - 2025-09-17: Removed RCON dependency entirely - now FTP-only architecture
+- 2025-09-17: Planned daily death leaderboard feature with survival champion tracking
 
 ## Constitutional Requirements
 
@@ -81,3 +89,4 @@ src/
 4. ✅ Error handling and reconnection logic
 5. ✅ Log position tracking and duplicate prevention
 6. ✅ RCON removal - simplified FTP-only architecture
+7. 🔄 Daily death leaderboard with survival champion tracking
