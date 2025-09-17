@@ -14,7 +14,7 @@ export class DiscordFormatter {
   createDeathAnnouncementEmbed(
     deathEvent: DeathEvent,
     totalDeaths: number,
-    previousDeathTimestamp?: Date | null
+    previousDeathTimestamp?: string | null
   ): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle("💀 Player Death Alert")
@@ -113,7 +113,7 @@ export class DiscordFormatter {
   }
 
   private formatTimeSinceLastDeath(
-    previousDeathTimestamp: Date | null | undefined,
+    previousDeathTimestamp: string | null | undefined,
     currentDeathTimestamp: Date
   ): string {
     if (!previousDeathTimestamp) {
@@ -121,7 +121,8 @@ export class DiscordFormatter {
     }
 
     const timeDiffMs =
-      currentDeathTimestamp.getTime() - previousDeathTimestamp.getTime();
+      currentDeathTimestamp.getTime() -
+      new Date(previousDeathTimestamp).getTime();
     const timeDiffSeconds = Math.floor(timeDiffMs / 1000);
 
     // Less than a minute

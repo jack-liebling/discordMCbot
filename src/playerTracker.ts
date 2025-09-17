@@ -27,7 +27,7 @@ export class PlayerTracker {
 
       if (!player) {
         // Create new player
-        const now = new Date();
+        const now = new Date().toISOString();
         player = {
           username,
           totalDeaths: 0,
@@ -52,7 +52,7 @@ export class PlayerTracker {
     recorded: boolean;
     reason?: string;
     totalDeaths?: number;
-    previousDeathTimestamp?: Date;
+    previousDeathTimestamp?: string;
   }> {
     const username = deathEvent.playerId;
 
@@ -67,7 +67,9 @@ export class PlayerTracker {
       if (this.isRateLimited(player, deathEvent.timestamp)) {
         const timeSinceLastDeath =
           deathEvent.timestamp.getTime() -
-          (player.lastDeathTimestamp?.getTime() || 0);
+          (player.lastDeathTimestamp
+            ? new Date(player.lastDeathTimestamp).getTime()
+            : 0);
         const remainingCooldown = Math.ceil(
           (this.RATE_LIMIT_SECONDS * 1000 - timeSinceLastDeath) / 1000
         );
@@ -86,9 +88,9 @@ export class PlayerTracker {
 
       await this.storageService.updatePlayer(username, {
         totalDeaths: newTotalDeaths,
-        lastDeathTimestamp: deathEvent.timestamp,
-        lastUpdated: new Date(),
-        lastSeenTimestamp: deathEvent.timestamp, // Update activity tracking
+        lastDeathTimestamp: deathEvent.timestamp.toISOString(),
+        lastUpdated: new Date().toISOString(),
+        lastSeenTimestamp: deathEvent.timestamp.toISOString(), // Update activity tracking
       });
 
       this.logger.info(
@@ -115,7 +117,8 @@ export class PlayerTracker {
     }
 
     const timeSinceLastDeath =
-      currentDeathTime.getTime() - player.lastDeathTimestamp.getTime();
+      currentDeathTime.getTime() -
+      new Date(player.lastDeathTimestamp).getTime();
     const rateLimitMs = this.RATE_LIMIT_SECONDS * 1000;
 
     return timeSinceLastDeath < rateLimitMs;
@@ -124,8 +127,8 @@ export class PlayerTracker {
   async getPlayerStats(username: string): Promise<{
     exists: boolean;
     totalDeaths: number;
-    lastDeath: Date | null;
-    firstSeen: Date | null;
+    lastDeath: string | null;
+    firstSeen: string | null;
     daysSinceFirstSeen: number;
   }> {
     try {
@@ -142,7 +145,8 @@ export class PlayerTracker {
       }
 
       const daysSinceFirstSeen = Math.floor(
-        (Date.now() - player.firstSeen.getTime()) / (1000 * 60 * 60 * 24)
+        (Date.now() - new Date(player.firstSeen).getTime()) /
+          (1000 * 60 * 60 * 24)
       );
 
       return {
@@ -204,7 +208,7 @@ export class PlayerTracker {
       const playersToKeep: Record<string, Player> = {};
 
       for (const [username, player] of Object.entries(data.players)) {
-        if (player.lastUpdated > cutoffDate) {
+        if (new Date(player.lastUpdated) > cutoffDate) {
           playersToKeep[username] = player;
         } else {
           removedCount++;
@@ -235,7 +239,7 @@ export class PlayerTracker {
       }
 
       const timeSinceLastDeath =
-        Date.now() - player.lastDeathTimestamp.getTime();
+        Date.now() - new Date(player.lastDeathTimestamp).getTime();
       const rateLimitMs = this.RATE_LIMIT_SECONDS * 1000;
 
       if (timeSinceLastDeath >= rateLimitMs) {

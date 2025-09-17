@@ -12,10 +12,10 @@ export interface DeathEvent {
 export interface Player {
   username: string;
   totalDeaths: number;
-  lastDeathTimestamp: Date | null;
-  firstSeen: Date;
-  lastUpdated: Date;
-  lastSeenTimestamp: Date;
+  lastDeathTimestamp: string | null;
+  firstSeen: string;
+  lastUpdated: string;
+  lastSeenTimestamp: string;
 }
 
 // Daily leaderboard data structures
@@ -36,7 +36,7 @@ export interface LeaderboardEntry {
 export interface SurvivalChampion {
   username: string;
   timeAliveMs: number;
-  lastDeathTimestamp: Date | null;
+  lastDeathTimestamp: string | null;
   formattedTimeAlive: string; // Human-readable format
 }
 
@@ -87,6 +87,7 @@ export interface EnvironmentConfig {
   FTP_LOG_PATH?: string;
   LOG_CHECK_INTERVAL?: string;
   TIMEZONE?: string;
+  DATABASE_URL?: string;
 }
 
 // FTP configuration

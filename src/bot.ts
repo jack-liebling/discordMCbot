@@ -9,7 +9,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { ConfigLoader } from "./config";
-import { StorageService } from "./storage";
+import { HybridStorageService } from "./hybridStorage";
 import { DiscordFormatter } from "./discord";
 import { PlayerTracker } from "./playerTracker";
 import { AnnouncementService } from "./announcer";
@@ -24,7 +24,7 @@ export class DiscordBot {
   private readonly configLoader = ConfigLoader.getInstance();
 
   // Services
-  private storageService!: StorageService;
+  private storageService!: HybridStorageService;
   private formatter!: DiscordFormatter;
   private playerTracker!: PlayerTracker;
   private announcementService!: AnnouncementService;
@@ -101,8 +101,9 @@ export class DiscordBot {
     try {
       this.logger.info("Initializing bot services...");
 
-      // Initialize storage service
-      this.storageService = new StorageService();
+      // Initialize hybrid storage service (database + JSON fallback)
+      this.storageService = new HybridStorageService();
+      await this.storageService.initialize();
 
       // Initialize configuration with defaults
       await this.storageService.initializeConfig();
@@ -114,7 +115,7 @@ export class DiscordBot {
       this.formatter = new DiscordFormatter("Minecraft Server");
 
       // Initialize player tracker
-      this.playerTracker = new PlayerTracker(this.storageService);
+      this.playerTracker = new PlayerTracker(this.storageService as any);
 
       // Initialize announcement service
       this.announcementService = new AnnouncementService(
@@ -132,7 +133,7 @@ export class DiscordBot {
 
       this.logParserService = new LogParserService(
         ftpConfig,
-        this.storageService
+        this.storageService as any
       );
 
       await this.logParserService.connect();
@@ -159,7 +160,9 @@ export class DiscordBot {
       await this.announcementService.initialize();
 
       // Initialize leaderboard services
-      this.leaderboardService = new LeaderboardService(this.storageService);
+      this.leaderboardService = new LeaderboardService(
+        this.storageService as any
+      );
       this.schedulerService = new SchedulerService(this.leaderboardService);
 
       // Connect scheduler to announcer service

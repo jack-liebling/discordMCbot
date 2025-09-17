@@ -191,8 +191,8 @@ export class LeaderboardService {
   private calculateTimeAlive(player: Player): number {
     const now = Date.now();
     const lastDeathTime = player.lastDeathTimestamp
-      ? player.lastDeathTimestamp.getTime()
-      : player.firstSeen.getTime();
+      ? new Date(player.lastDeathTimestamp).getTime()
+      : new Date(player.firstSeen).getTime();
     return Math.max(0, now - lastDeathTime);
   }
 
