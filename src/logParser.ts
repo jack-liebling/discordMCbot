@@ -1,7 +1,14 @@
 // Log parser service for reading Minecraft server logs via FTP
 import FtpClient = require("ftp");
-import { FtpConfig, DeathEvent, IStorageService } from "./types";
+import {
+  FtpConfig,
+  DeathEvent,
+  IStorageService,
+  ActivityType,
+  NewPlayerActivity,
+} from "./types";
 import { Logger } from "./logger";
+import { ActivityParser } from "./activityParser";
 
 export class LogParserService {
   private readonly logger = Logger.getInstance();
@@ -11,6 +18,42 @@ export class LogParserService {
   private lastLogPosition = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
+
+  // Activity detection patterns
+  private static readonly ACTIVITY_PATTERNS = {
+    // Player join detection
+    JOIN: /\[(\d{2}:\d{2}:\d{2})\].*?\[Server thread\/INFO\]: (\w+) joined the game/,
+
+    // Player leave detection
+    LEAVE:
+      /\[(\d{2}:\d{2}:\d{2})\].*?\[Server thread\/INFO\]: (\w+) left the game/,
+
+    // Chat message detection
+    CHAT: /\[(\d{2}:\d{2}:\d{2})\].*?\[Async Chat Thread.*?\]: <(\w+)> (.+)/,
+
+    // Achievement detection
+    ACHIEVEMENT:
+      /\[(\d{2}:\d{2}:\d{2})\].*?\[Server thread\/INFO\]: (\w+) has made the advancement \[(.+)\]/,
+
+    // Death detection (existing pattern enhanced)
+    DEATH: /\[(\d{2}:\d{2}:\d{2})\].*?\[Server thread\/INFO\]: (\w+) (.+)/,
+  };
+
+  // Enhanced patterns for additional data extraction
+  private static readonly ENHANCED_PATTERNS = {
+    // Player login with coordinates
+    LOGIN_DETAILS:
+      /(\w+)\[\/([0-9.:]+)\] logged in with entity id (\d+) at \(\[([^\]]+)\]([^)]+)\)/,
+
+    // UUID mapping
+    UUID_MAPPING: /UUID of player (\w+) is ([a-f0-9-]+)/,
+
+    // Disconnect reason
+    DISCONNECT_REASON: /(\w+) lost connection: (.+)/,
+
+    // Server status messages (for context)
+    PLAYER_COUNT: /There are (\d+) of a max of (\d+) players online:?\s*(.*)/,
+  };
 
   constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
@@ -150,6 +193,7 @@ export class LogParserService {
 
   private parseLogLines(lines: string[]): void {
     for (const line of lines) {
+      // Process deaths (existing functionality)
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
         this.logger.debug(
@@ -157,6 +201,85 @@ export class LogParserService {
         );
         this.onDeathCallback!(deathEvent);
       }
+
+      // Process other player activities
+      this.processPlayerActivity(line);
+    }
+  }
+
+  private async processPlayerActivity(logLine: string): Promise<void> {
+    // Check each activity pattern
+    for (const [activityType, pattern] of Object.entries(
+      LogParserService.ACTIVITY_PATTERNS
+    )) {
+      if (activityType === "DEATH") continue; // Deaths handled separately
+
+      const match = pattern.exec(logLine);
+      if (match) {
+        const activity = this.parseActivity(
+          activityType as ActivityType,
+          match,
+          logLine
+        );
+        if (activity) {
+          await this.storageService.storeActivity(activity);
+        }
+        break; // Only process one activity type per line
+      }
+    }
+  }
+
+  private parseActivity(
+    type: ActivityType,
+    match: RegExpExecArray,
+    logLine: string
+  ): NewPlayerActivity | null {
+    try {
+      const timestamp = new Date();
+      const username = match[2];
+
+      switch (type) {
+        case "JOIN":
+          return {
+            username,
+            timestamp,
+            activity_type: "JOIN",
+            metadata: ActivityParser.extractJoinMetadata(logLine),
+          };
+
+        case "LEAVE":
+          return {
+            username,
+            timestamp,
+            activity_type: "LEAVE",
+            metadata: ActivityParser.extractLeaveMetadata(logLine),
+          };
+
+        case "CHAT":
+          return {
+            username,
+            timestamp,
+            activity_type: "CHAT",
+            metadata: ActivityParser.extractChatMetadata(match[3] || ""),
+          };
+
+        case "ACHIEVEMENT":
+          return {
+            username,
+            timestamp,
+            activity_type: "ACHIEVEMENT",
+            metadata: ActivityParser.extractAchievementMetadata(
+              match[3] || "",
+              logLine
+            ),
+          };
+
+        default:
+          return null;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to parse activity: ${type}`, { error, logLine });
+      return null;
     }
   }
 

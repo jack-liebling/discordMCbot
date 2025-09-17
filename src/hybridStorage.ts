@@ -7,6 +7,10 @@ import {
   PlayersData,
   LogProcessingState,
   IStorageService,
+  NewPlayerActivity,
+  ActivityType,
+  PlayerActivity,
+  DeathEvent,
 } from "./types";
 import { Logger } from "./logger";
 
@@ -349,5 +353,86 @@ export class HybridStorageService implements IStorageService {
    */
   isUsingDatabase(): boolean {
     return this.useDatabase;
+  }
+
+  /**
+   * Store player activity
+   */
+  async storeActivity(activity: NewPlayerActivity): Promise<void> {
+    try {
+      if (this.useDatabase && this.dbService) {
+        await this.dbService.storeActivity(activity);
+      } else {
+        // JSON fallback - store in memory or log for now
+        this.logger.info(
+          `Activity stored (JSON mode): ${activity.username} - ${activity.activity_type}`
+        );
+        // TODO: Implement JSON file activity storage if needed
+      }
+    } catch (error) {
+      this.logger.error("Failed to store activity", { error, activity });
+      await this.fallbackToJson();
+      // Retry with JSON service if needed
+    }
+  }
+
+  /**
+   * Get player activities
+   */
+  async getPlayerActivities(
+    username: string,
+    activityType?: ActivityType
+  ): Promise<PlayerActivity[]> {
+    try {
+      if (this.useDatabase && this.dbService) {
+        return await this.dbService.getPlayerActivities(username, activityType);
+      } else {
+        // JSON fallback - return empty array for now
+        this.logger.warn("Activity retrieval not implemented for JSON mode");
+        return [];
+      }
+    } catch (error) {
+      this.logger.error("Failed to get player activities", {
+        error,
+        username,
+        activityType,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Store death event
+   */
+  async storeDeath(death: DeathEvent): Promise<void> {
+    try {
+      if (this.useDatabase && this.dbService) {
+        await this.dbService.storeDeath(death);
+      } else {
+        // JSON fallback - use existing player tracking
+        if (this.jsonService) {
+          const playersData = await this.jsonService.loadPlayers();
+          const player = playersData.players[death.playerId] || {
+            username: death.playerId,
+            totalDeaths: 0,
+            firstSeen: death.timestamp.toISOString(),
+            lastSeenTimestamp: death.timestamp.toISOString(),
+            lastDeathTimestamp: null,
+            lastUpdated: death.timestamp.toISOString(),
+          };
+
+          player.totalDeaths++;
+          player.lastDeathTimestamp = death.timestamp.toISOString();
+          player.lastSeenTimestamp = death.timestamp.toISOString();
+          player.lastUpdated = death.timestamp.toISOString();
+
+          playersData.players[death.playerId] = player;
+          await this.jsonService.savePlayers(playersData);
+        }
+      }
+    } catch (error) {
+      this.logger.error("Failed to store death", { error, death });
+      await this.fallbackToJson();
+    }
   }
 }
