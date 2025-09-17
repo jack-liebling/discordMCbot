@@ -116,4 +116,155 @@ export interface IStorageService {
   // Log state management
   getLogState(): Promise<LogProcessingState | null>;
   saveLogState(state: LogProcessingState): Promise<void>;
+
+  // Activity management
+  storeActivity(activity: NewPlayerActivity): Promise<void>;
+  getPlayerActivities(
+    username: string,
+    activityType?: ActivityType
+  ): Promise<PlayerActivity[]>;
+  storeDeath(death: DeathEvent): Promise<void>;
+}
+
+// Enhanced Player Activity Tracking Types
+
+export type ActivityType = "JOIN" | "LEAVE" | "CHAT" | "ACHIEVEMENT" | "DEATH";
+
+export interface PlayerActivity {
+  id: number;
+  username: string;
+  activity_type: ActivityType;
+  timestamp: Date;
+  metadata?: ActivityMetadata;
+  created_at: Date;
+}
+
+export interface NewPlayerActivity {
+  username: string;
+  activity_type: ActivityType;
+  timestamp: Date;
+  metadata?: ActivityMetadata;
+}
+
+export type ActivityMetadata =
+  | JoinMetadata
+  | LeaveMetadata
+  | ChatMetadata
+  | AchievementMetadata
+  | DeathMetadata;
+
+export interface JoinMetadata {
+  coordinates?: { x: number; y: number; z: number };
+  dimension?: string;
+  ip_address?: string;
+  entity_id?: number;
+}
+
+export interface LeaveMetadata {
+  reason?: string;
+  duration_ms?: number;
+}
+
+export interface ChatMetadata {
+  message_length: number;
+  contains_mention?: boolean;
+  thread_info?: string;
+}
+
+export interface AchievementMetadata {
+  advancement_name: string;
+  advancement_category?: string;
+  is_first_time?: boolean;
+}
+
+export interface DeathMetadata {
+  cause: string;
+  coordinates?: { x: number; y: number; z: number };
+  experience_level?: number;
+  items_lost?: number;
+}
+
+export interface ActivitySession {
+  session_id: string;
+  username: string;
+  start_timestamp: Date;
+  end_timestamp: Date | null;
+  duration_ms: number | null;
+  activities_during_session: PlayerActivity[];
+  achievements_earned: number;
+  chat_messages_sent: number;
+  deaths_occurred: number;
+}
+
+export interface EnhancedPlayerStats {
+  // Existing player fields
+  username: string;
+  totalDeaths: number;
+  lastDeathTimestamp: string | null;
+  firstSeen: string;
+  lastUpdated: string;
+  lastSeenTimestamp: string;
+
+  // New calculated fields
+  totalSessions: number;
+  totalPlaytimeMs: number;
+  totalChatMessages: number;
+  totalAchievements: number;
+  lastActivityTimestamp: string;
+  activityBreakdown: Record<ActivityType, number>;
+}
+
+export interface ActivityQueryOptions {
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
+  orderBy?: "timestamp" | "activity_type";
+  orderDirection?: "ASC" | "DESC";
+}
+
+export interface SessionQueryOptions {
+  startDate?: Date;
+  endDate?: Date;
+  includeOngoing?: boolean;
+  minDurationMs?: number;
+}
+
+export interface TimeRange {
+  startDate: Date;
+  endDate: Date;
+}
+
+export interface ActivitySummary {
+  totalActivities: number;
+  activePlayersCount: number;
+  activityBreakdown: Record<ActivityType, number>;
+  averageSessionDuration: number;
+  mostActivePlayer: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  orphanedJoins: number;
+  orphanedLeaves: number;
+}
+
+// Database Migration Types
+export interface Migration {
+  version: number;
+  name: string;
+  description: string;
+  up: (client: any) => Promise<void>;
+  down?: (client: any) => Promise<void>;
+}
+
+export interface SchemaVersion {
+  version: number;
+  applied_at: Date;
+  migration_name: string;
+  description: string;
+  success: boolean;
+  error_message?: string;
 }

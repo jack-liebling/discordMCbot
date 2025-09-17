@@ -8,6 +8,10 @@ import {
   LogProcessingState,
   LeaderboardConfig,
   IStorageService,
+  NewPlayerActivity,
+  ActivityType,
+  PlayerActivity,
+  DeathEvent,
 } from "./types";
 import { Logger } from "./logger";
 
@@ -220,5 +224,57 @@ export class StorageService implements IStorageService {
       // Backup creation is optional, don't fail the operation
       console.warn(`Failed to create backup for ${filePath}:`, error);
     }
+  }
+
+  /**
+   * Store player activity (JSON mode - simplified logging)
+   */
+  async storeActivity(activity: NewPlayerActivity): Promise<void> {
+    this.logger.info(
+      `Activity logged: ${activity.username} - ${activity.activity_type}`,
+      {
+        timestamp: activity.timestamp,
+        metadata: activity.metadata,
+      }
+    );
+    // In JSON mode, we could extend this to store activities in a separate file if needed
+    // For now, just log the activity
+  }
+
+  /**
+   * Get player activities (JSON mode - not implemented)
+   */
+  async getPlayerActivities(
+    username: string,
+    activityType?: ActivityType
+  ): Promise<PlayerActivity[]> {
+    this.logger.warn("getPlayerActivities not implemented in JSON mode");
+    return [];
+  }
+
+  /**
+   * Store death event (JSON mode - update player data)
+   */
+  async storeDeath(death: DeathEvent): Promise<void> {
+    const playersData = await this.loadPlayers();
+    const player = playersData.players[death.playerId] || {
+      username: death.playerId,
+      totalDeaths: 0,
+      firstSeen: death.timestamp.toISOString(),
+      lastSeenTimestamp: death.timestamp.toISOString(),
+      lastDeathTimestamp: null,
+      lastUpdated: death.timestamp.toISOString(),
+    };
+
+    player.totalDeaths++;
+    player.lastDeathTimestamp = death.timestamp.toISOString();
+    player.lastSeenTimestamp = death.timestamp.toISOString();
+    player.lastUpdated = death.timestamp.toISOString();
+
+    playersData.players[death.playerId] = player;
+    await this.savePlayers(playersData);
+    this.logger.debug(
+      `Death stored in JSON: ${death.playerId} - ${death.cause}`
+    );
   }
 }
