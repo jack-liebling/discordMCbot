@@ -100,3 +100,20 @@ export interface FtpConfig {
   checkInterval: number;
   timezone: string;
 }
+
+// Storage interface that both StorageService and HybridStorageService implement
+export interface IStorageService {
+  // Player management
+  getPlayer(username: string): Promise<Player | null>;
+  updatePlayer(username: string, playerData: Partial<Player>): Promise<void>;
+  loadPlayers(): Promise<PlayersData>;
+  savePlayers(data: PlayersData): Promise<void>;
+
+  // Configuration management
+  loadConfig(): Promise<ConfigData | null>;
+  saveConfig(config: ConfigData): Promise<void>;
+
+  // Log state management
+  getLogState(): Promise<LogProcessingState | null>;
+  saveLogState(state: LogProcessingState): Promise<void>;
+}

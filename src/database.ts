@@ -1,6 +1,6 @@
 // Database service for PostgreSQL connection and operations
 import { Pool, PoolClient } from "pg";
-import { Player, ConfigData } from "./types";
+import { Player, ConfigData, LogProcessingState } from "./types";
 import { Logger } from "./logger";
 
 export class DatabaseService {
@@ -28,6 +28,44 @@ export class DatabaseService {
       DatabaseService.instance = new DatabaseService(databaseUrl);
     }
     return DatabaseService.instance;
+  }
+
+  /**
+   * Safely serialize data to JSON with error handling
+   */
+  private safeJsonStringify(data: any): string {
+    try {
+      return JSON.stringify(data, (key, value) => {
+        // Handle circular references
+        if (typeof value === "object" && value !== null) {
+          // Simple circular reference detection
+          if (value.constructor === Object || Array.isArray(value)) {
+            return value;
+          }
+          // Convert other objects to string representation
+          return value.toString();
+        }
+        // Filter out functions and undefined values
+        if (typeof value === "function" || value === undefined) {
+          return null;
+        }
+        return value;
+      });
+    } catch (error) {
+      this.logger.error("Failed to serialize data to JSON", error);
+      // Fallback: create a basic object with only serializable properties
+      try {
+        const fallback = JSON.parse(
+          JSON.stringify(data, Object.getOwnPropertyNames(data))
+        );
+        return JSON.stringify(fallback);
+      } catch (fallbackError) {
+        this.logger.error("Fallback serialization also failed", fallbackError);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        throw new Error(`Unable to serialize data: ${errorMessage}`);
+      }
+    }
   }
 
   /**
@@ -170,6 +208,7 @@ export class DatabaseService {
   async saveConfig(config: ConfigData): Promise<void> {
     const client = await this.pool.connect();
     try {
+      const serializedConfig = this.safeJsonStringify(config);
       await client.query(
         `
         INSERT INTO config (key, value, updated_at) VALUES ($1, $2, NOW())
@@ -177,8 +216,59 @@ export class DatabaseService {
           value = EXCLUDED.value,
           updated_at = EXCLUDED.updated_at
       `,
-        ["app_config", JSON.stringify(config)]
+        ["app_config", serializedConfig]
       );
+    } catch (error) {
+      this.logger.error("Failed to save config to database", error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get log processing state
+   */
+  async getLogState(): Promise<LogProcessingState | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        "SELECT value FROM config WHERE key = $1",
+        ["log_state"]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0].value as LogProcessingState;
+    } catch (error) {
+      this.logger.error("Failed to get log state from database", error);
+      return null;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save log processing state
+   */
+  async saveLogState(state: LogProcessingState): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      const serializedState = this.safeJsonStringify(state);
+      await client.query(
+        `INSERT INTO config (key, value) 
+         VALUES ($1, $2) 
+         ON CONFLICT (key) 
+         DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+        ["log_state", serializedState]
+      );
+
+      this.logger.debug("Log state saved to database");
+    } catch (error) {
+      this.logger.error("Failed to save log state to database", error);
+      throw error;
     } finally {
       client.release();
     }

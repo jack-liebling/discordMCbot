@@ -114,8 +114,8 @@ export class DiscordBot {
       // Initialize Discord formatter (use generic server name)
       this.formatter = new DiscordFormatter("Minecraft Server");
 
-      // Initialize player tracker
-      this.playerTracker = new PlayerTracker(this.storageService as any);
+      // Initialize player tracker with type-safe storage interface
+      this.playerTracker = new PlayerTracker(this.storageService);
 
       // Initialize announcement service
       this.announcementService = new AnnouncementService(
@@ -133,7 +133,7 @@ export class DiscordBot {
 
       this.logParserService = new LogParserService(
         ftpConfig,
-        this.storageService as any
+        this.storageService
       );
 
       await this.logParserService.connect();
@@ -160,9 +160,7 @@ export class DiscordBot {
       await this.announcementService.initialize();
 
       // Initialize leaderboard services
-      this.leaderboardService = new LeaderboardService(
-        this.storageService as any
-      );
+      this.leaderboardService = new LeaderboardService(this.storageService);
       this.schedulerService = new SchedulerService(this.leaderboardService);
 
       // Connect scheduler to announcer service

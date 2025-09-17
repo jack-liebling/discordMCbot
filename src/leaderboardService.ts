@@ -4,14 +4,14 @@ import {
   LeaderboardEntry,
   SurvivalChampion,
   Player,
+  IStorageService,
 } from "./types";
-import { StorageService } from "./storage";
 
 export class LeaderboardService {
-  private storageService: StorageService;
+  private storageService: IStorageService;
 
-  constructor(storageService?: StorageService) {
-    this.storageService = storageService || new StorageService();
+  constructor(storageService: IStorageService) {
+    this.storageService = storageService;
   }
 
   /**

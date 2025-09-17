@@ -1,10 +1,16 @@
 // Hybrid storage service supporting both PostgreSQL and JSON file storage
 import { DatabaseService } from "./database";
 import { StorageService as JsonStorageService } from "./storage";
-import { Player, ConfigData, PlayersData } from "./types";
+import {
+  Player,
+  ConfigData,
+  PlayersData,
+  LogProcessingState,
+  IStorageService,
+} from "./types";
 import { Logger } from "./logger";
 
-export class HybridStorageService {
+export class HybridStorageService implements IStorageService {
   private dbService?: DatabaseService;
   private jsonService?: JsonStorageService;
   private logger = Logger.getInstance();
@@ -148,34 +154,51 @@ export class HybridStorageService {
   /**
    * Get log processing state
    */
-  async getLogState(): Promise<any> {
-    if (this.useDatabase && this.dbService) {
-      // For database, log state might be stored differently
-      // For now, fallback to JSON
-      await this.fallbackToJson();
+  async getLogState(): Promise<LogProcessingState | null> {
+    try {
+      if (this.useDatabase && this.dbService) {
+        return await this.dbService.getLogState();
+      } else if (this.jsonService) {
+        return await this.jsonService.getLogState();
+      } else {
+        throw new Error("No storage service available");
+      }
+    } catch (error) {
+      this.logger.error("Failed to get log state", error);
+      // Fallback to JSON only if database fails and JSON service is available
+      if (this.useDatabase && this.jsonService) {
+        this.logger.warn("Database failed, falling back to JSON for log state");
+        await this.fallbackToJson();
+        return await this.jsonService.getLogState();
+      }
+      return null;
     }
-
-    if (this.jsonService) {
-      return await this.jsonService.getLogState();
-    }
-    return null;
   }
 
   /**
    * Save log processing state
    */
-  async saveLogState(state: any): Promise<void> {
-    if (this.useDatabase && this.dbService) {
-      // For database, log state might be stored differently
-      // For now, fallback to JSON
-      await this.fallbackToJson();
-    }
-
-    if (this.jsonService) {
-      await this.jsonService.saveLogState(state);
+  async saveLogState(state: LogProcessingState): Promise<void> {
+    try {
+      if (this.useDatabase && this.dbService) {
+        await this.dbService.saveLogState(state);
+      } else if (this.jsonService) {
+        await this.jsonService.saveLogState(state);
+      } else {
+        throw new Error("No storage service available");
+      }
+    } catch (error) {
+      this.logger.error("Failed to save log state", error);
+      // Fallback to JSON only if database fails and JSON service is available
+      if (this.useDatabase && this.jsonService) {
+        this.logger.warn("Database failed, falling back to JSON for log state");
+        await this.fallbackToJson();
+        await this.jsonService.saveLogState(state);
+      } else {
+        throw error;
+      }
     }
   }
-
   /**
    * Update player's last seen timestamp
    */

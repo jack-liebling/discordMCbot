@@ -11,10 +11,10 @@ export class SchedulerService {
   private isRunning = false;
 
   constructor(
-    leaderboardService?: LeaderboardService,
+    leaderboardService: LeaderboardService,
     announcementCallback?: (leaderboard: DailyLeaderboard) => Promise<void>
   ) {
-    this.leaderboardService = leaderboardService || new LeaderboardService();
+    this.leaderboardService = leaderboardService;
     this.announcementCallback = announcementCallback;
   }
 

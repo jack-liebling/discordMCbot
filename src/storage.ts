@@ -7,10 +7,11 @@ import {
   Player,
   LogProcessingState,
   LeaderboardConfig,
+  IStorageService,
 } from "./types";
 import { Logger } from "./logger";
 
-export class StorageService {
+export class StorageService implements IStorageService {
   private readonly playersFile = join(process.cwd(), "players.json");
   private readonly configFile = join(process.cwd(), "config.json");
   private readonly logger = Logger.getInstance();

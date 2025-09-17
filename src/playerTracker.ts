@@ -1,14 +1,13 @@
 // T012: Player tracking service managing death counts and rate limiting
-import { Player, DeathEvent } from "./types";
-import { StorageService } from "./storage";
+import { Player, DeathEvent, IStorageService } from "./types";
 import { Logger } from "./logger";
 
 export class PlayerTracker {
-  private readonly storageService: StorageService;
+  private readonly storageService: IStorageService;
   private readonly logger = Logger.getInstance();
   private readonly RATE_LIMIT_SECONDS = 30;
 
-  constructor(storageService: StorageService) {
+  constructor(storageService: IStorageService) {
     this.storageService = storageService;
   }
 
