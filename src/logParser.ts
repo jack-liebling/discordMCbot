@@ -295,43 +295,151 @@ export class LogParserService {
       return null;
     }
 
-    // Look for death message patterns
+    // Comprehensive death message patterns based on Minecraft Wiki
     const deathPatterns = [
-      // Standard death messages
-      /(\w+) fell from a high place/,
-      /(\w+) was slain by (.+)/,
-      /(\w+) was shot by (.+)/,
-      /(\w+) was killed by (.+)/,
+      // Cactus deaths
+      /(\w+) was pricked to death/,
+      /(\w+) walked into a cactus while trying to escape (.+)/,
+
+      // Drowning deaths
       /(\w+) drowned/,
-      /(\w+) suffocated in a wall/,
+      /(\w+) drowned while trying to escape (.+)/,
+
+      // Drying out (dolphins/axolotls)
+      /(\w+) died from dehydration/,
+      /(\w+) died from dehydration while trying to escape (.+)/,
+
+      // Elytra collision
+      /(\w+) experienced kinetic energy/,
+      /(\w+) experienced kinetic energy while trying to escape (.+)/,
+
+      // Explosions
+      /(\w+) blew up/,
       /(\w+) was blown up by (.+)/,
+      /(\w+) was blown up by (.+) using (.+)/,
+      /(\w+) was killed by \[Intentional Game Design\]/,
+
+      // Falling deaths
       /(\w+) hit the ground too hard/,
+      /(\w+) hit the ground too hard while trying to escape (.+)/,
+      /(\w+) fell from a high place/,
       /(\w+) fell off a ladder/,
       /(\w+) fell off some vines/,
-      /(\w+) fell out of the world/,
-      /(\w+) was struck by lightning/,
-      /(\w+) burned to death/,
+      /(\w+) fell off some weeping vines/,
+      /(\w+) fell off some twisting vines/,
+      /(\w+) fell off scaffolding/,
+      /(\w+) fell while climbing/,
+      /(\w+) was doomed to fall/,
+      /(\w+) was doomed to fall by (.+)/,
+      /(\w+) was doomed to fall by (.+) using (.+)/,
+      /(\w+) was impaled on a stalagmite/,
+      /(\w+) was impaled on a stalagmite while fighting (.+)/,
+
+      // Falling blocks
+      /(\w+) was squashed by a falling anvil/,
+      /(\w+) was squashed by a falling block/,
+      /(\w+) was skewered by a falling stalactite/,
+
+      // Fire deaths
       /(\w+) went up in flames/,
+      /(\w+) walked into fire while fighting (.+)/,
+      /(\w+) burned to death/,
+      /(\w+) was burned to a crisp while fighting (.+)/,
+
+      // Firework deaths
+      /(\w+) went off with a bang/,
+      /(\w+) went off with a bang due to a firework fired from (.+) by (.+)/,
+
+      // Lava deaths
       /(\w+) tried to swim in lava/,
-      /(\w+) discovered floor was lava/,
-      /(\w+) starved to death/,
+      /(\w+) tried to swim in lava to escape (.+)/,
+
+      // Lightning deaths
+      /(\w+) was struck by lightning/,
+      /(\w+) was struck by lightning while fighting (.+)/,
+
+      // Magma block deaths
+      /(\w+) discovered the floor was lava/,
+      /(\w+) walked into the danger zone due to (.+)/,
+
+      // Magic deaths (instant damage, evoker fangs, guardian laser)
+      /(\w+) was killed by magic/,
+      /(\w+) was killed by magic while trying to escape (.+)/,
+      /(\w+) was killed by (.+) using magic/,
+      /(\w+) was killed by (.+) using (.+)/,
+
+      // Powder snow deaths
+      /(\w+) froze to death/,
+      /(\w+) was frozen to death by (.+)/,
+
+      // Player and mob attacks
+      /(\w+) was slain by (.+)/,
+      /(\w+) was slain by (.+) using (.+)/,
+      /(\w+) was stung to death/,
+      /(\w+) was stung to death by (.+) using (.+)/,
+      /(\w+) was obliterated by a sonically-charged shriek/,
+      /(\w+) was obliterated by a sonically-charged shriek while trying to escape (.+) wielding (.+)/,
+      /(\w+) was smashed by (.+)/,
+      /(\w+) was smashed by (.+) with (.+)/,
+
+      // Projectile deaths
+      /(\w+) was shot by (.+)/,
+      /(\w+) was shot by (.+) using (.+)/,
       /(\w+) was pummeled by (.+)/,
-      /(\w+) was pricked to death/,
-      /(\w+) walked into a cactus whilst trying to escape (.+)/,
-      /(\w+) was roasted in dragon breath/,
-      /(\w+) withered away/,
+      /(\w+) was pummeled by (.+) using (.+)/,
+      /(\w+) was fireballed by (.+)/,
+      /(\w+) was fireballed by (.+) using (.+)/,
+      /(\w+) was shot by a skull from (.+)/,
+      /(\w+) was shot by a skull from (.+) using (.+)/,
+
+      // Starvation deaths
+      /(\w+) starved to death/,
+      /(\w+) starved to death while fighting (.+)/,
+
+      // Suffocation deaths
+      /(\w+) suffocated in a wall/,
+      /(\w+) suffocated in a wall while fighting (.+)/,
+      /(\w+) was squished too much/,
       /(\w+) was squashed by (.+)/,
-      /(\w+) experienced kinetic energy/,
+      /(\w+) left the confines of this world/,
+      /(\w+) left the confines of this world while fighting (.+)/,
+
+      // Sweet berry bush deaths
+      /(\w+) was poked to death by a sweet berry bush/,
+      /(\w+) was poked to death by a sweet berry bush while trying to escape (.+)/,
+
+      // Thorns enchantment deaths
+      /(\w+) was killed while trying to hurt (.+)/,
+      /(\w+) was killed by (.+) while trying to hurt (.+)/,
+
+      // Trident deaths
       /(\w+) was impaled by (.+)/,
-      /(\w+) was skewered by (.+)/,
-      /(\w+) was obliterated by (.+)/,
-      /(\w+) was killed by \[Intentional Game Design\]/,
-      // Generic catch-all for any player death
+      /(\w+) was impaled by (.+) with (.+)/,
+
+      // Void deaths
+      /(\w+) fell out of the world/,
+      /(\w+) didn't want to live in the same world as (.+)/,
+
+      // Wither effect deaths
+      /(\w+) withered away/,
+      /(\w+) withered away while fighting (.+)/,
+
+      // Generic deaths
       /(\w+) died/,
+      /(\w+) died because of (.+)/,
+      /(\w+) was killed/,
+      /(\w+) was killed while fighting (.+)/,
+
+      // Dragon breath (rare)
+      /(\w+) was roasted in dragon's breath/,
+      /(\w+) was roasted in dragon's breath by (.+)/,
+
+      // Crash prevention fallback
+      /(\w+) was killed by even more magic/,
     ];
 
     for (const pattern of deathPatterns) {
-      const match = logLine.match(pattern);
+      const match = pattern.exec(logLine);
       if (match) {
         const playerId = match[1];
         let cause = match[0].substring(playerId.length + 1); // Remove player name and space
@@ -341,7 +449,18 @@ export class LogParserService {
           cause.startsWith("was ") ||
           cause.startsWith("fell ") ||
           cause.startsWith("drowned") ||
-          cause.startsWith("suffocated")
+          cause.startsWith("suffocated") ||
+          cause.startsWith("starved") ||
+          cause.startsWith("withered") ||
+          cause.startsWith("burned") ||
+          cause.startsWith("froze") ||
+          cause.startsWith("went ") ||
+          cause.startsWith("tried ") ||
+          cause.startsWith("discovered") ||
+          cause.startsWith("walked ") ||
+          cause.startsWith("left ") ||
+          cause.startsWith("experienced") ||
+          cause.startsWith("didn't")
         ) {
           // Keep these messages as they are
         } else {

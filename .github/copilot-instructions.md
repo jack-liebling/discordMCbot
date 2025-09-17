@@ -37,7 +37,7 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 
 - Use Discord embeds for structured death announcements
 - FTP log parsing every 10 seconds for accurate death detection with real causes
-- Rate limit: ignore deaths <30 seconds apart from same player
+- Rate limit: ignore deaths <5 seconds apart from same player (reduced from 30)
 - Comprehensive death message parsing with regex patterns
 - Environment variables for all secrets (tokens, passwords, FTP credentials, database connection)
 - Auto-reconnection logic for FTP connections
@@ -45,6 +45,7 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 - JSON file fallback system for when database is unavailable
 - Comprehensive player activity tracking beyond deaths (join, leave, chat, achievements)
 - Activity-specific rate limiting and database schema with player_activities table
+- **Example log file**: `example_latest.log` contains sample Minecraft server logs for testing and context
 
 ## File Structure
 
