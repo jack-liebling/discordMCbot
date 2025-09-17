@@ -1,19 +1,18 @@
 // Log parser service for reading Minecraft server logs via FTP
 import FtpClient = require("ftp");
-import { FtpConfig, DeathEvent } from "./types";
+import { FtpConfig, DeathEvent, IStorageService } from "./types";
 import { Logger } from "./logger";
-import { StorageService } from "./storage";
 
 export class LogParserService {
   private readonly logger = Logger.getInstance();
   private readonly ftpConfig: FtpConfig;
-  private readonly storageService: StorageService;
+  private readonly storageService: IStorageService;
   private ftpClient: FtpClient | null = null;
   private lastLogPosition = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
 
-  constructor(ftpConfig: FtpConfig, storageService: StorageService) {
+  constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
     this.storageService = storageService;
   }

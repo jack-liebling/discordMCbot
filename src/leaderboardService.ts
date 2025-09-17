@@ -4,14 +4,14 @@ import {
   LeaderboardEntry,
   SurvivalChampion,
   Player,
+  IStorageService,
 } from "./types";
-import { StorageService } from "./storage";
 
 export class LeaderboardService {
-  private storageService: StorageService;
+  private storageService: IStorageService;
 
-  constructor(storageService?: StorageService) {
-    this.storageService = storageService || new StorageService();
+  constructor(storageService: IStorageService) {
+    this.storageService = storageService;
   }
 
   /**
@@ -191,8 +191,8 @@ export class LeaderboardService {
   private calculateTimeAlive(player: Player): number {
     const now = Date.now();
     const lastDeathTime = player.lastDeathTimestamp
-      ? player.lastDeathTimestamp.getTime()
-      : player.firstSeen.getTime();
+      ? new Date(player.lastDeathTimestamp).getTime()
+      : new Date(player.firstSeen).getTime();
     return Math.max(0, now - lastDeathTime);
   }
 

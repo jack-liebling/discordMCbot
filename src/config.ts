@@ -46,6 +46,7 @@ export class ConfigLoader {
       FTP_LOG_PATH: process.env.FTP_LOG_PATH,
       LOG_CHECK_INTERVAL: process.env.LOG_CHECK_INTERVAL || "10",
       TIMEZONE: process.env.TIMEZONE || "America/New_York",
+      DATABASE_URL: process.env.DATABASE_URL,
     };
   }
 

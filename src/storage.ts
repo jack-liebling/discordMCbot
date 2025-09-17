@@ -7,10 +7,11 @@ import {
   Player,
   LogProcessingState,
   LeaderboardConfig,
+  IStorageService,
 } from "./types";
 import { Logger } from "./logger";
 
-export class StorageService {
+export class StorageService implements IStorageService {
   private readonly playersFile = join(process.cwd(), "players.json");
   private readonly configFile = join(process.cwd(), "config.json");
   private readonly logger = Logger.getInstance();
@@ -22,18 +23,11 @@ export class StorageService {
       const parsed = JSON.parse(data) as PlayersData;
 
       // Convert date strings back to Date objects and handle migration
+      // No date conversion needed - we're keeping dates as ISO strings now
+      // Just ensure lastSeenTimestamp exists for migration
       Object.values(parsed.players).forEach((player) => {
-        player.firstSeen = new Date(player.firstSeen);
-        player.lastUpdated = new Date(player.lastUpdated);
-        if (player.lastDeathTimestamp) {
-          player.lastDeathTimestamp = new Date(player.lastDeathTimestamp);
-        }
-
-        // Migration: Add lastSeenTimestamp if missing
         if (!player.lastSeenTimestamp) {
           player.lastSeenTimestamp = player.lastUpdated;
-        } else {
-          player.lastSeenTimestamp = new Date(player.lastSeenTimestamp);
         }
       });
 
@@ -74,7 +68,7 @@ export class StorageService {
     const data = await this.loadPlayers();
 
     if (!data.players[username]) {
-      const now = new Date();
+      const now = new Date().toISOString();
       data.players[username] = {
         username,
         totalDeaths: 0,
@@ -88,7 +82,7 @@ export class StorageService {
     data.players[username] = {
       ...data.players[username],
       ...updates,
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
     };
 
     await this.savePlayers(data);
@@ -175,8 +169,8 @@ export class StorageService {
     const data = await this.loadPlayers();
 
     if (data.players[username]) {
-      data.players[username].lastSeenTimestamp = new Date();
-      data.players[username].lastUpdated = new Date();
+      data.players[username].lastSeenTimestamp = new Date().toISOString();
+      data.players[username].lastUpdated = new Date().toISOString();
       await this.savePlayers(data);
     }
   }

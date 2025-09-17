@@ -67,7 +67,7 @@ export class AnnouncementService {
   async announcePlayerDeath(
     deathEvent: DeathEvent,
     totalDeaths: number,
-    previousDeathTimestamp?: Date
+    previousDeathTimestamp?: string
   ): Promise<void> {
     if (!this.isReady || !this.channel) {
       // Queue the message for later processing
