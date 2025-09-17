@@ -47,6 +47,12 @@ export class ConfigLoader {
       LOG_CHECK_INTERVAL: process.env.LOG_CHECK_INTERVAL || "10",
       TIMEZONE: process.env.TIMEZONE || "America/New_York",
       DATABASE_URL: process.env.DATABASE_URL,
+      // Session notification configuration
+      SESSION_NOTIFICATIONS_ENABLED:
+        process.env.SESSION_NOTIFICATIONS_ENABLED || "false",
+      CRAFTERS_ROLE_ID: process.env.CRAFTERS_ROLE_ID,
+      WHO_IS_ON_CHANNEL_ID: process.env.WHO_IS_ON_CHANNEL_ID,
+      SESSION_COOLDOWN_SECONDS: process.env.SESSION_COOLDOWN_SECONDS || "120",
     };
   }
 
@@ -83,6 +89,26 @@ export class ConfigLoader {
     };
   }
 
+  public getSessionNotificationConfig() {
+    const enabled =
+      this.config.SESSION_NOTIFICATIONS_ENABLED?.toLowerCase() === "true";
+
+    if (!enabled) {
+      return null;
+    }
+
+    if (!this.config.CRAFTERS_ROLE_ID || !this.config.WHO_IS_ON_CHANNEL_ID) {
+      return null;
+    }
+
+    return {
+      enabled: true,
+      craftersRoleId: this.config.CRAFTERS_ROLE_ID,
+      whoIsOnChannelId: this.config.WHO_IS_ON_CHANNEL_ID,
+      cooldownSeconds: parseInt(this.config.SESSION_COOLDOWN_SECONDS || "120"),
+    };
+  }
+
   public validateConfig(): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -98,6 +124,36 @@ export class ConfigLoader {
     // Validate server name is not empty
     if (!this.config.SERVER_NAME.trim()) {
       errors.push("SERVER_NAME cannot be empty");
+    }
+
+    // Validate session notification configuration if enabled
+    const sessionEnabled =
+      this.config.SESSION_NOTIFICATIONS_ENABLED?.toLowerCase() === "true";
+    if (sessionEnabled) {
+      if (!this.config.CRAFTERS_ROLE_ID) {
+        errors.push(
+          "CRAFTERS_ROLE_ID is required when session notifications are enabled"
+        );
+      } else if (!/^\d{17,19}$/.test(this.config.CRAFTERS_ROLE_ID)) {
+        errors.push("CRAFTERS_ROLE_ID must be a valid Discord snowflake ID");
+      }
+
+      if (!this.config.WHO_IS_ON_CHANNEL_ID) {
+        errors.push(
+          "WHO_IS_ON_CHANNEL_ID is required when session notifications are enabled"
+        );
+      } else if (!/^\d{17,19}$/.test(this.config.WHO_IS_ON_CHANNEL_ID)) {
+        errors.push(
+          "WHO_IS_ON_CHANNEL_ID must be a valid Discord snowflake ID"
+        );
+      }
+
+      const cooldownSeconds = parseInt(
+        this.config.SESSION_COOLDOWN_SECONDS || "120"
+      );
+      if (isNaN(cooldownSeconds) || cooldownSeconds < 0) {
+        errors.push("SESSION_COOLDOWN_SECONDS must be a non-negative number");
+      }
     }
 
     return {

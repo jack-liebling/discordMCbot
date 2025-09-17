@@ -6,6 +6,8 @@ import {
   IStorageService,
   ActivityType,
   NewPlayerActivity,
+  SessionEvent,
+  SessionEventCallback,
 } from "./types";
 import { Logger } from "./logger";
 import { ActivityParser } from "./activityParser";
@@ -18,6 +20,7 @@ export class LogParserService {
   private lastLogPosition = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
+  private onSessionEventCallback: SessionEventCallback | null = null;
 
   // Activity detection patterns
   private static readonly ACTIVITY_PATTERNS = {
@@ -117,6 +120,11 @@ export class LogParserService {
     this.logger.info(
       `Started log monitoring with ${this.ftpConfig.checkInterval}s interval`
     );
+  }
+
+  addSessionEventCallback(callback: SessionEventCallback): void {
+    this.onSessionEventCallback = callback;
+    this.logger.info("Session event callback registered");
   }
 
   private async checkLogFile(): Promise<void> {
@@ -270,6 +278,31 @@ export class LogParserService {
       this.logger.debug(
         `Batch processed ${parsedActivities.length} activities`
       );
+
+      // Trigger session event callbacks for JOIN/LEAVE activities
+      if (this.onSessionEventCallback) {
+        const sessionEvents = activities
+          .filter(
+            (activity) => activity.type === "JOIN" || activity.type === "LEAVE"
+          )
+          .map(
+            (activity) =>
+              ({
+                type: activity.type,
+                username: activity.match[2],
+                timestamp: new Date(),
+                rawLogLine: activity.logLine,
+              } as SessionEvent)
+          );
+
+        for (const sessionEvent of sessionEvents) {
+          try {
+            await this.onSessionEventCallback(sessionEvent);
+          } catch (error) {
+            this.logger.error("Session event callback failed", error);
+          }
+        }
+      }
     }
   }
 
