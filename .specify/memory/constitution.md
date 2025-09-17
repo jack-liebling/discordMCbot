@@ -1,50 +1,72 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Discord MC Bot Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Single Feature Focus
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Start with one core feature and get it working well. Since this is for a small group of friends, focus on making that one feature reliable and useful before considering any additions.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Friend-Focused Design
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+The feature should enhance the friend group experience. Commands and functionality should be intuitive for casual users, not requiring technical knowledge or complex syntax.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Just Make It Work
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Priority is on getting the feature functional, not perfect. Quick iteration and direct feedback from friends is more valuable than extensive planning.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Safety and Moderation
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Even among friends, include basic safety measures. Implement rate limiting, permission checks, and graceful error handling to prevent accidental spam or misuse.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Keep It Simple
+
+Code should be straightforward and readable since this is a side project. Use clear naming conventions and comment only when necessary for understanding.
+
+## Development Guidelines
+
+### Code Organization
+
+- Keep the single feature implementation clean and contained
+- Use environment variables for sensitive data (bot tokens, API keys)
+- Write the minimum viable code to get the feature working
+
+### Error Handling
+
+- Provide basic error messages when things go wrong
+- Don't crash the bot - handle errors gracefully
+- Add simple timeouts for potentially long-running operations
+
+### Command Design
+
+- Use an intuitive command name that friends will remember
+- Provide a helpful error message when the command is used incorrectly
+- Keep response times reasonable when possible
+
+## Security and Privacy
+
+### Data Handling
+
+- Minimize data collection - only store what's necessary for functionality
+- Don't log sensitive information (passwords, personal details)
+- Respect Discord's rate limits and API guidelines
+- Use appropriate permissions - request only what the bot needs
+
+### Access Control
+
+- Implement basic role-based permissions for administrative commands
+- Allow server admins to disable specific commands if needed
+- Provide a way to restrict bot usage to specific channels if desired
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution guides development decisions for the Discord bot. Since this is a simple project with one feature, keep things straightforward.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+- Focus on making the feature work for the friend group
+- Get feedback directly from friends and iterate quickly
+- Don't overthink it - ship when it works
+
+**Version**: 1.2.0 | **Ratified**: September 16, 2025 | **Last Amended**: September 17, 2025
+
+## Implementation Notes
+
+This constitution has guided the development of a Discord bot that monitors Minecraft deaths through FTP log parsing rather than RCON polling. The choice prioritizes accuracy (real death causes from logs) over simplicity while maintaining the core principle of "just make it work" for friend group usage.
