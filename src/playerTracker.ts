@@ -4,8 +4,8 @@ import { StorageService } from "./storage";
 import { Logger } from "./logger";
 
 export class PlayerTracker {
-  private storageService: StorageService;
-  private logger = Logger.getInstance();
+  private readonly storageService: StorageService;
+  private readonly logger = Logger.getInstance();
   private readonly RATE_LIMIT_SECONDS = 30;
 
   constructor(storageService: StorageService) {
@@ -27,12 +27,14 @@ export class PlayerTracker {
 
       if (!player) {
         // Create new player
+        const now = new Date();
         player = {
           username,
           totalDeaths: 0,
           lastDeathTimestamp: null,
-          firstSeen: new Date(),
-          lastUpdated: new Date(),
+          firstSeen: now,
+          lastUpdated: now,
+          lastSeenTimestamp: now,
         };
 
         await this.storageService.updatePlayer(username, player);
@@ -46,9 +48,7 @@ export class PlayerTracker {
     }
   }
 
-  async recordDeath(
-    deathEvent: DeathEvent
-  ): Promise<{
+  async recordDeath(deathEvent: DeathEvent): Promise<{
     recorded: boolean;
     reason?: string;
     totalDeaths?: number;
@@ -88,6 +88,7 @@ export class PlayerTracker {
         totalDeaths: newTotalDeaths,
         lastDeathTimestamp: deathEvent.timestamp,
         lastUpdated: new Date(),
+        lastSeenTimestamp: deathEvent.timestamp, // Update activity tracking
       });
 
       this.logger.info(
@@ -229,7 +230,7 @@ export class PlayerTracker {
     try {
       const player = await this.storageService.getPlayer(username);
 
-      if (!player || !player.lastDeathTimestamp) {
+      if (!player?.lastDeathTimestamp) {
         return 0; // No rate limit
       }
 

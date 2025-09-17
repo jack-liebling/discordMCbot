@@ -1,12 +1,14 @@
 // T015: Discord announcement service sending formatted messages to channels
 import { Client, TextChannel } from "discord.js";
 import { DiscordFormatter } from "./discord";
-import { DeathEvent } from "./types";
+import { DeathEvent, DailyLeaderboard } from "./types";
+import { LeaderboardFormatter } from "./leaderboardFormatter";
 import { Logger } from "./logger";
 
 export class AnnouncementService {
   private readonly client: Client;
   private readonly formatter: DiscordFormatter;
+  private readonly leaderboardFormatter: LeaderboardFormatter;
   private readonly logger = Logger.getInstance();
   private readonly channelId: string;
   private readonly guildId: string;
@@ -24,6 +26,7 @@ export class AnnouncementService {
   ) {
     this.client = client;
     this.formatter = formatter;
+    this.leaderboardFormatter = new LeaderboardFormatter();
     this.channelId = channelId;
     this.guildId = guildId;
   }
@@ -179,6 +182,35 @@ export class AnnouncementService {
     }
   }
 
+  async announceDailyLeaderboard(leaderboard: DailyLeaderboard): Promise<void> {
+    if (!this.isReady || !this.channel) {
+      this.queueMessage(() => this.announceDailyLeaderboard(leaderboard));
+      return;
+    }
+
+    try {
+      const embed =
+        this.leaderboardFormatter.createLeaderboardEmbed(leaderboard);
+      await this.channel.send({ embeds: [embed] });
+
+      this.logger.info("Daily leaderboard announcement sent", {
+        entries: leaderboard.leaderboard.length,
+        champion: leaderboard.survivalChampion?.username || "none",
+        channel: this.channel.name,
+      });
+    } catch (error) {
+      this.logger.error("Failed to send daily leaderboard", error);
+
+      // Try to send a simplified fallback message
+      const topPlayer = leaderboard.leaderboard[0];
+      const fallbackText = topPlayer
+        ? `📊 Daily Death Leaderboard - Top: ${topPlayer.username} (${topPlayer.totalDeaths} deaths)`
+        : "📊 Daily Death Leaderboard - No deaths recorded today";
+
+      await this.sendFallbackMessage(fallbackText);
+    }
+  }
+
   private async sendFallbackMessage(content: string): Promise<void> {
     if (!this.channel) return;
 
@@ -281,5 +313,10 @@ export class AnnouncementService {
     this.processingQueue = false;
 
     this.logger.info("Announcement service reset");
+  }
+
+  // Create a leaderboard embed for manual commands
+  createLeaderboardEmbed(leaderboard: DailyLeaderboard) {
+    return this.leaderboardFormatter.createLeaderboardEmbed(leaderboard);
   }
 }

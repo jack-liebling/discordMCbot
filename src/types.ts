@@ -15,6 +15,29 @@ export interface Player {
   lastDeathTimestamp: Date | null;
   firstSeen: Date;
   lastUpdated: Date;
+  lastSeenTimestamp: Date;
+}
+
+// Daily leaderboard data structures
+export interface DailyLeaderboard {
+  generatedAt: Date;
+  totalPlayers: number;
+  leaderboard: LeaderboardEntry[];
+  survivalChampion: SurvivalChampion | null;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  totalDeaths: number;
+  isActive: boolean; // Within 7-day activity window
+}
+
+export interface SurvivalChampion {
+  username: string;
+  timeAliveMs: number;
+  lastDeathTimestamp: Date | null;
+  formattedTimeAlive: string; // Human-readable format
 }
 
 // T005: DiscordChannelConfig interface
@@ -41,6 +64,14 @@ export interface LogProcessingState {
 export interface ConfigData {
   discord: DiscordChannelConfig;
   logState?: LogProcessingState;
+  leaderboard?: LeaderboardConfig;
+}
+
+export interface LeaderboardConfig {
+  lastAnnouncementDate: string; // ISO date string (YYYY-MM-DD)
+  enabled: boolean;
+  timezone: string; // Default: "EST"
+  announcementTime: string; // Default: "23:59"
 }
 
 // Environment configuration
