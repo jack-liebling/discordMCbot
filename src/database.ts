@@ -539,10 +539,10 @@ export class DatabaseService {
     try {
       // First ensure player exists
       await client.query(
-        `INSERT INTO players (username, first_seen, last_seen, is_active)
-         VALUES ($1, $2, $2, true)
+        `INSERT INTO players (username, first_seen, last_seen_timestamp)
+         VALUES ($1, $2, $2)
          ON CONFLICT (username) 
-         DO UPDATE SET last_seen = EXCLUDED.last_seen, is_active = true`,
+         DO UPDATE SET last_seen_timestamp = EXCLUDED.last_seen_timestamp`,
         [activity.username, activity.timestamp]
       );
 
@@ -625,15 +625,13 @@ export class DatabaseService {
     try {
       // First ensure player exists
       await client.query(
-        `INSERT INTO players (username, first_seen, last_seen, is_active, total_deaths, experience_level)
-         VALUES ($1, $2, $2, true, 1, $3)
+        `INSERT INTO players (username, first_seen, last_seen_timestamp, total_deaths)
+         VALUES ($1, $2, $2, 1)
          ON CONFLICT (username) 
          DO UPDATE SET 
-           last_seen = EXCLUDED.last_seen, 
-           is_active = true,
-           total_deaths = players.total_deaths + 1,
-           experience_level = EXCLUDED.experience_level`,
-        [death.playerId, death.timestamp, death.experienceLevel || 0]
+           last_seen_timestamp = EXCLUDED.last_seen_timestamp, 
+           total_deaths = players.total_deaths + 1`,
+        [death.playerId, death.timestamp]
       );
 
       // Store death as activity

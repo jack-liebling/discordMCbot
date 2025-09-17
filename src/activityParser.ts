@@ -40,11 +40,7 @@ export class ActivityParser {
         const z = parseFloat(match[3]);
 
         // Validate coordinates are within reasonable Minecraft bounds
-        if (
-          this.isValidCoordinate(x) &&
-          this.isValidCoordinate(y) &&
-          this.isValidCoordinate(z)
-        ) {
+        if (this.areValidCoordinates(x, y, z)) {
           return { x, y, z };
         }
       }
@@ -209,6 +205,23 @@ export class ActivityParser {
     }
 
     return metadata;
+  }
+
+  /**
+   * Validate if all three coordinates are within reasonable Minecraft bounds
+   */
+  private static areValidCoordinates(x: number, y: number, z: number): boolean {
+    return (
+      !isNaN(x) &&
+      x >= -30000000 &&
+      x <= 30000000 &&
+      !isNaN(y) &&
+      y >= -30000000 &&
+      y <= 30000000 &&
+      !isNaN(z) &&
+      z >= -30000000 &&
+      z <= 30000000
+    );
   }
 
   /**

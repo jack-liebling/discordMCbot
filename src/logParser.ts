@@ -130,7 +130,7 @@ export class LogParserService {
 
       if (newLines.length > 0) {
         this.logger.debug(`Processing ${newLines.length} new log lines`);
-        this.parseLogLines(newLines);
+        await this.parseLogLines(newLines);
       }
     } catch (error) {
       this.logger.error("Failed to check log file", error);
@@ -191,7 +191,14 @@ export class LogParserService {
     return newContent.split("\n").filter((line) => line.trim().length > 0);
   }
 
-  private parseLogLines(lines: string[]): void {
+  private async parseLogLines(lines: string[]): Promise<void> {
+    const activities: Array<{
+      type: ActivityType;
+      match: RegExpExecArray;
+      logLine: string;
+    }> = [];
+
+    // First pass: collect all deaths and activities
     for (const line of lines) {
       // Process deaths (existing functionality)
       const deathEvent = this.parseDeathMessage(line);
@@ -202,12 +209,24 @@ export class LogParserService {
         this.onDeathCallback!(deathEvent);
       }
 
-      // Process other player activities
-      this.processPlayerActivity(line);
+      // Collect other player activities for batch processing
+      this.collectPlayerActivity(line, activities);
+    }
+
+    // Second pass: batch process activities
+    if (activities.length > 0) {
+      await this.processBatchedActivities(activities);
     }
   }
 
-  private async processPlayerActivity(logLine: string): Promise<void> {
+  private collectPlayerActivity(
+    logLine: string,
+    activities: Array<{
+      type: ActivityType;
+      match: RegExpExecArray;
+      logLine: string;
+    }>
+  ): void {
     // Check each activity pattern
     for (const [activityType, pattern] of Object.entries(
       LogParserService.ACTIVITY_PATTERNS
@@ -216,16 +235,41 @@ export class LogParserService {
 
       const match = pattern.exec(logLine);
       if (match) {
-        const activity = this.parseActivity(
-          activityType as ActivityType,
+        activities.push({
+          type: activityType as ActivityType,
           match,
-          logLine
-        );
-        if (activity) {
-          await this.storageService.storeActivity(activity);
-        }
+          logLine,
+        });
         break; // Only process one activity type per line
       }
+    }
+  }
+
+  private async processBatchedActivities(
+    activities: Array<{
+      type: ActivityType;
+      match: RegExpExecArray;
+      logLine: string;
+    }>
+  ): Promise<void> {
+    // Parse all activities first
+    const parsedActivities = activities
+      .map(({ type, match, logLine }) =>
+        this.parseActivity(type, match, logLine)
+      )
+      .filter((activity): activity is NewPlayerActivity => activity !== null);
+
+    // Batch store all activities concurrently
+    if (parsedActivities.length > 0) {
+      await Promise.all(
+        parsedActivities.map((activity) =>
+          this.storageService.storeActivity(activity)
+        )
+      );
+
+      this.logger.debug(
+        `Batch processed ${parsedActivities.length} activities`
+      );
     }
   }
 
