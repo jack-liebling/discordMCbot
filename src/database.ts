@@ -824,7 +824,7 @@ export class DatabaseService {
         `
         SELECT username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
         FROM player_session_notifications
-        WHERE username = $1 AND is_online = true AND notification_message_id IS NOT NULL AND status = 'active'
+        WHERE username = $1 AND notification_message_id IS NOT NULL AND status = 'active'
         `,
         [username]
       );
