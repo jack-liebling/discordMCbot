@@ -390,22 +390,23 @@ export class LogParserService {
       minutes
     ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
-    // Parse the time as local time in the configured timezone, then convert to UTC
-    const localDate = new Date(`${todayInServerTz}T${timeStr}`);
+    // Parse the time as UTC first, then adjust for the server timezone
+    const utcDate = new Date(`${todayInServerTz}T${timeStr}.000Z`);
 
     // Calculate timezone offset for the configured timezone
-    const jan = new Date(localDate.getFullYear(), 0, 1);
+    const jan = new Date(utcDate.getFullYear(), 0, 1);
     const janOffset = this.getTimezoneOffsetForDate(jan, configuredTimezone);
 
     // Use the current offset (accounting for DST)
     const currentOffset = this.getTimezoneOffsetForDate(
-      localDate,
+      utcDate,
       configuredTimezone
     );
 
-    // Convert local time to UTC by adding the timezone offset
+    // Convert from server timezone to UTC by subtracting the offset
+    // If server is EDT (UTC-4), offset is -240, so we subtract -240 (add 240) to get UTC
     const logTimestamp = new Date(
-      localDate.getTime() + currentOffset * 60 * 1000
+      utcDate.getTime() - currentOffset * 60 * 1000
     );
 
     // Log the raw parsing for debugging timezone issues, but only if specifically enabled
@@ -418,7 +419,7 @@ export class LogParserService {
           rawTime: timestampMatch[1],
           serverDate: todayInServerTz,
           timeString: timeStr,
-          localTime: localDate.toISOString(),
+          utcBase: utcDate.toISOString(),
           finalISO: logTimestamp.toISOString(),
           finalLocal: logTimestamp.toLocaleString(),
           timezone: configuredTimezone,
