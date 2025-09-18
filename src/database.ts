@@ -761,6 +761,7 @@ export class DatabaseService {
     try {
       const expiresAt =
         data.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours default
+      const eventTimestamp = data.timestamp || new Date(); // Use provided timestamp or current time
 
       const result = await client.query(
         `
@@ -771,7 +772,7 @@ export class DatabaseService {
         DO UPDATE SET 
           is_online = $2,
           last_join_timestamp = CASE WHEN $2 = true THEN $3 ELSE player_session_notifications.last_join_timestamp END,
-          last_leave_timestamp = CASE WHEN $2 = false THEN NOW() ELSE player_session_notifications.last_leave_timestamp END,
+          last_leave_timestamp = CASE WHEN $2 = false THEN $7 ELSE player_session_notifications.last_leave_timestamp END,
           notification_message_id = $4,
           delete_scheduled_at = $5,
           status = $6,
@@ -781,10 +782,11 @@ export class DatabaseService {
         [
           data.username,
           data.type === "JOIN",
-          data.type === "JOIN" ? new Date() : null, // only set join timestamp for JOIN events
+          data.type === "JOIN" ? eventTimestamp : null, // use actual event timestamp for JOIN events
           data.discordMessageId,
           data.type === "JOIN" ? null : expiresAt,
           "active",
+          data.type === "LEAVE" ? eventTimestamp : null, // use actual event timestamp for LEAVE events
         ]
       );
 
@@ -1088,6 +1090,8 @@ export class DatabaseService {
   ): Promise<void> {
     const client = await this.pool.connect();
     try {
+      const eventTime = sessionTimestamp || new Date();
+
       await client.query(
         `
         INSERT INTO player_session_notifications 
@@ -1096,22 +1100,22 @@ export class DatabaseService {
         ON CONFLICT (username) 
         DO UPDATE SET 
           is_online = $2,
-          last_join_timestamp = CASE WHEN $2 = true THEN COALESCE($3, NOW()) ELSE player_session_notifications.last_join_timestamp END,
-          last_leave_timestamp = CASE WHEN $2 = false THEN COALESCE($4, NOW()) ELSE player_session_notifications.last_leave_timestamp END,
+          last_join_timestamp = CASE WHEN $2 = true THEN $3 ELSE player_session_notifications.last_join_timestamp END,
+          last_leave_timestamp = CASE WHEN $2 = false THEN $4 ELSE player_session_notifications.last_leave_timestamp END,
           updated_at = NOW()
         `,
         [
           username,
           isOnline,
-          isOnline ? sessionTimestamp || new Date() : null,
-          !isOnline ? sessionTimestamp || new Date() : null,
+          isOnline ? eventTime : null, // Only update join timestamp for JOIN events
+          !isOnline ? eventTime : null, // Only update leave timestamp for LEAVE events
         ]
       );
 
       this.logger.debug(
         `Updated session state for ${username}: ${
           isOnline ? "online" : "offline"
-        }`
+        } at ${eventTime.toISOString()}`
       );
     } catch (error) {
       this.logger.error("Failed to update player session state", {

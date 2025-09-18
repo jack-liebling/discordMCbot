@@ -138,6 +138,7 @@ export class SessionNotificationService {
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
         expiresAt: new Date(Date.now() + this.config.deletionDelayMs),
+        timestamp: sessionEvent.timestamp, // Use actual event timestamp
       });
 
       this.logger.info("User rejoined - existing notification preserved", {
@@ -182,6 +183,7 @@ export class SessionNotificationService {
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
         expiresAt: new Date(Date.now() + this.config.deletionDelayMs), // Configurable deletion delay
+        timestamp: sessionEvent.timestamp, // Use actual event timestamp from logs
       };
 
       await this.database.recordSessionNotification(notificationData);
