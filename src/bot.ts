@@ -114,8 +114,19 @@ export class DiscordBot {
       // Get configuration
       const discordConfig = this.configLoader.getDiscordConfig();
 
-      // Initialize Discord formatter (use generic server name)
-      this.formatter = new DiscordFormatter("Minecraft Server");
+      // Get FTP config for timezone (needed for both formatter and log parser)
+      const ftpConfig = this.configLoader.getFtpConfig();
+      if (!ftpConfig) {
+        throw new Error(
+          "FTP configuration required for timezone and log monitoring"
+        );
+      }
+
+      // Initialize Discord formatter with configured timezone
+      this.formatter = new DiscordFormatter(
+        "Minecraft Server",
+        ftpConfig.timezone
+      );
 
       // Initialize player tracker with type-safe storage interface
       this.playerTracker = new PlayerTracker(this.storageService);
@@ -129,11 +140,6 @@ export class DiscordBot {
       );
 
       // Initialize log parser - this is now required
-      const ftpConfig = this.configLoader.getFtpConfig();
-      if (!ftpConfig) {
-        throw new Error("FTP configuration required for death monitoring");
-      }
-
       this.logParserService = new LogParserService(
         ftpConfig,
         this.storageService

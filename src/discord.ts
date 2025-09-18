@@ -6,9 +6,11 @@ import { Logger } from "./logger";
 export class DiscordFormatter {
   private readonly logger = Logger.getInstance();
   private readonly serverName: string;
+  private readonly timezone: string;
 
-  constructor(serverName: string) {
+  constructor(serverName: string, timezone: string = "America/New_York") {
     this.serverName = serverName;
+    this.timezone = timezone;
   }
 
   createDeathAnnouncementEmbed(
@@ -127,9 +129,9 @@ export class DiscordFormatter {
   }
 
   private formatTimestamp(timestamp: Date): string {
-    // Use proper timezone formatting for EDT/EST (America/New_York)
+    // Use the configured timezone for proper EDT/EST handling
     const options: Intl.DateTimeFormatOptions = {
-      timeZone: "America/New_York", // Automatically handles EDT/EST
+      timeZone: this.timezone,
       year: "numeric",
       month: "short",
       day: "numeric",
