@@ -6,9 +6,11 @@ import { Logger } from "./logger";
 export class DiscordFormatter {
   private readonly logger = Logger.getInstance();
   private readonly serverName: string;
+  private readonly timezone: string;
 
-  constructor(serverName: string) {
+  constructor(serverName: string, timezone: string = "America/New_York") {
     this.serverName = serverName;
+    this.timezone = timezone;
   }
 
   createDeathAnnouncementEmbed(
@@ -127,11 +129,9 @@ export class DiscordFormatter {
   }
 
   private formatTimestamp(timestamp: Date): string {
-    // Convert server timestamp to player timezone (subtract 4 hours)
-    const playerTime = new Date(timestamp.getTime() - 4 * 60 * 60 * 1000);
-
-    // Format as "Sep 16, 2025 at 10:25 AM"
+    // Use the configured timezone for proper EDT/EST handling
     const options: Intl.DateTimeFormatOptions = {
+      timeZone: this.timezone,
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -140,7 +140,7 @@ export class DiscordFormatter {
       hour12: true,
     };
 
-    return playerTime.toLocaleDateString("en-US", options);
+    return timestamp.toLocaleString("en-US", options);
   }
 
   private formatTimeSinceLastDeath(
