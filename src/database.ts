@@ -887,37 +887,6 @@ export class DatabaseService {
   }
 
   /**
-   * Schedule notification for deletion
-   */
-  public async scheduleNotificationDeletion(
-    username: string,
-    deleteAt: Date
-  ): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `
-        UPDATE player_session_notifications 
-        SET delete_scheduled_at = $2, status = 'scheduled_for_deletion', is_online = false, updated_at = NOW()
-        WHERE username = $1
-        `,
-        [username, deleteAt]
-      );
-
-      return (result.rowCount || 0) > 0;
-    } catch (error) {
-      this.logger.error("Failed to schedule notification deletion", {
-        error,
-        username,
-        deleteAt,
-      });
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
    * Remove expired notification records (automated cleanup)
    */
   public async cleanupExpiredNotifications(): Promise<number> {
