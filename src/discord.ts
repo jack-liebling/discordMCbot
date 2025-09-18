@@ -127,11 +127,9 @@ export class DiscordFormatter {
   }
 
   private formatTimestamp(timestamp: Date): string {
-    // Convert server timestamp to player timezone (subtract 4 hours)
-    const playerTime = new Date(timestamp.getTime() - 4 * 60 * 60 * 1000);
-
-    // Format as "Sep 16, 2025 at 10:25 AM"
+    // Use proper timezone formatting for EDT/EST (America/New_York)
     const options: Intl.DateTimeFormatOptions = {
+      timeZone: "America/New_York", // Automatically handles EDT/EST
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -140,7 +138,7 @@ export class DiscordFormatter {
       hour12: true,
     };
 
-    return playerTime.toLocaleDateString("en-US", options);
+    return timestamp.toLocaleDateString("en-US", options);
   }
 
   private formatTimeSinceLastDeath(
