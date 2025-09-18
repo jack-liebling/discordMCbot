@@ -1,0 +1,541 @@
+[07:16:13] [ServerMain/INFO]: [bootstrap] Running Java 22 (OpenJDK 64-Bit Server VM 22.0.2+9; Eclipse Adoptium Temurin-22.0.2+9) on Linux 5.15.0-121-generic (amd64)
+[07:16:13] [ServerMain/INFO]: [bootstrap] Loading Paper 1.21.8-60-main@29c8822 (2025-09-06T21:49:13Z) for Minecraft 1.21.8
+[07:16:13] [ServerMain/INFO]: [PluginInitializerManager] Initializing plugins...
+[07:16:13] [ServerMain/INFO]: [PluginInitializerManager] Initialized 1 plugin
+[07:16:13] [ServerMain/INFO]: [PluginInitializerManager] Bukkit plugins (1):
+ - LuckPerms (5.5.0)
+[07:16:16] [ServerMain/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, name=PROD]
+[07:16:16] [ServerMain/INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Initialising converters for DataConverter...
+[07:16:16] [Yggdrasil Key Fetcher/ERROR]: Got an error with a html body connecting to https://api.minecraftservices.com/publickeys: <!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Transitional//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml'>
+
+<head>
+    <meta content='text/html; charset=utf-8' http-equiv='content-type' />
+    <style type='text/css'>
+        body {
+            font-family: Arial;
+            margin-left: 40px;
+        }
+
+        img {
+            border: 0 none;
+        }
+
+        #content {
+            margin-left: auto;
+            margin-right: auto
+        }
+
+        #message h1 {
+            font-size: 24px;
+            font-weight: normal;
+            color: #000000;
+            margin: 34px 0px 0px 0px
+        }
+
+        #message h2 {
+            font-size: 20px;
+            font-weight: normal;
+            color: #000000;
+            margin: 34px 0px 0px 0px
+        }
+
+        #message p {
+            font-size: 16px;
+            color: #000000;
+            margin: 8px 0px 0px 0px
+        }
+
+        #message hr {
+            margin: 15px 0px
+        }
+
+        #errorref {
+            font-size: 11px;
+            color: #737373;
+            margin-top: 41px
+        }
+    </style>
+    <title>Service unavailable</title>
+</head>
+
+<body>
+    <div id='content'>
+        <div id='message'>
+            <h2>The request is blocked.</h2>
+        </div>
+        <div id='errorref'>
+            <span>20250918T071616Z-177958b6665vvpx4hC1MIAvvps0000000ng000000000t70y            </span>
+        </div>
+    </div>
+</body>
+</html>
+
+[07:16:16] [Yggdrasil Key Fetcher/ERROR]: Failed to request yggdrasil public key
+com.mojang.authlib.exceptions.MinecraftClientHttpException: Status: 429
+	at com.mojang.authlib.minecraft.client.MinecraftClient.readInputStream(MinecraftClient.java:100) ~[authlib-6.0.58.jar:?]
+	at com.mojang.authlib.minecraft.client.MinecraftClient.get(MinecraftClient.java:56) ~[authlib-6.0.58.jar:?]
+	at com.mojang.authlib.yggdrasil.YggdrasilServicesKeyInfo.fetch(YggdrasilServicesKeyInfo.java:114) ~[authlib-6.0.58.jar:?]
+	at com.mojang.authlib.yggdrasil.YggdrasilServicesKeyInfo$1.run(YggdrasilServicesKeyInfo.java:89) ~[authlib-6.0.58.jar:?]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572) ~[?:?]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[?:?]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]
+	at java.base/java.lang.Thread.run(Thread.java:1570) ~[?:?]
+[07:16:17] [ServerMain/INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Finished initialising converters for DataConverter in 417.9ms
+[07:16:18] [ServerMain/INFO]: Loaded 1407 recipes
+[07:16:18] [ServerMain/INFO]: Loaded 1520 advancements
+[07:16:18] [Server thread/INFO]: Starting minecraft server version 1.21.8
+[07:16:18] [Server thread/INFO]: Loading properties
+[07:16:18] [Server thread/INFO]: This server is running Paper version 1.21.8-60-main@29c8822 (2025-09-06T21:49:13Z) (Implementing API version 1.21.8-R0.1-SNAPSHOT)
+[07:16:18] [Server thread/INFO]: [spark] This server bundles the spark profiler. For more information please visit https://docs.papermc.io/paper/profiling
+[07:16:18] [Server thread/INFO]: Server Ping Player Sample Count: 12
+[07:16:18] [Server thread/INFO]: Using 4 threads for Netty based IO
+[07:16:19] [Server thread/INFO]: [MoonriseCommon] Paper is using 1 worker threads, 1 I/O threads
+[07:16:19] [Server thread/INFO]: [ChunkTaskScheduler] Chunk system is using population gen parallelism: true
+[07:16:19] [Server thread/INFO]: Default game type: SURVIVAL
+[07:16:19] [Server thread/INFO]: Generating keypair
+[07:16:19] [Server thread/INFO]: Starting Minecraft server on 209.192.186.165:25702
+[07:16:19] [Server thread/INFO]: Using epoll channel type
+[07:16:19] [Server thread/INFO]: Paper: Using libdeflate (Linux x86_64) compression from Velocity.
+[07:16:19] [Server thread/INFO]: Paper: Using OpenSSL 3.x.x (Linux x86_64) cipher from Velocity.
+[07:16:19] [Server thread/INFO]: [LuckPerms] Loading server plugin LuckPerms v5.5.0
+[07:16:19] [Server thread/INFO]: Server permissions file permissions.yml is empty, ignoring it
+[07:16:19] [Server thread/INFO]: [LuckPerms] Enabling LuckPerms v5.5.0
+[07:16:19] [Server thread/INFO]:         __    
+[07:16:19] [Server thread/INFO]:   |    |__)   LuckPerms v5.5.0
+[07:16:19] [Server thread/INFO]:   |___ |      Running on Bukkit - Paper
+[07:16:19] [Server thread/INFO]: 
+[07:16:19] [Server thread/INFO]: [LuckPerms] Loading configuration...
+[07:16:19] [Server thread/INFO]: [LuckPerms] Loading storage provider... [H2]
+[07:16:19] [Server thread/INFO]: [LuckPerms] Loading internal permission managers...
+[07:16:19] [Server thread/INFO]: [LuckPerms] Performing initial data load...
+[07:16:19] [Server thread/INFO]: [LuckPerms] Successfully enabled. (took 454ms)
+[07:16:19] [Server thread/INFO]: Preparing level "Ironman"
+[07:16:20] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld
+[07:16:20] [Server thread/INFO]: Preparing spawn area: 0%
+[07:16:20] [Server thread/INFO]: Time elapsed: 490 ms
+[07:16:20] [Server thread/INFO]: Preparing start region for dimension minecraft:the_nether
+[07:16:20] [Server thread/INFO]: Preparing spawn area: 0%
+[07:16:20] [Server thread/INFO]: Time elapsed: 186 ms
+[07:16:20] [Server thread/INFO]: Preparing start region for dimension minecraft:the_end
+[07:16:20] [Server thread/INFO]: Preparing spawn area: 0%
+[07:16:21] [Server thread/INFO]: Time elapsed: 79 ms
+[07:16:21] [Server thread/INFO]: [spark] Starting background profiler...
+[07:16:21] [Server thread/INFO]: Done preparing level "Ironman" (1.342s)
+[07:16:21] [Server thread/INFO]: Starting remote control listener
+[07:16:21] [Server thread/INFO]: Thread RCON Listener started
+[07:16:21] [Server thread/INFO]: RCON running on 209.192.186.165:25575
+[07:16:21] [Server thread/INFO]: Running delayed init tasks
+[07:16:21] [Server thread/INFO]: Done (8.746s)! For help, type "help"
+[07:19:25] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:22:29] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:25:33] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:28:37] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:31:41] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:34:46] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:37:50] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:40:54] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:43:58] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:47:02] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:50:06] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:53:10] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:56:14] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[07:59:18] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:02:22] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:05:27] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:08:31] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:11:35] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:14:39] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:17:43] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:20:47] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:23:51] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:26:55] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:29:59] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:33:04] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:36:08] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:39:12] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:42:16] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:45:20] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:48:24] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:51:28] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:54:32] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[08:57:36] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:00:40] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:03:45] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:06:49] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:09:53] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:12:57] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:16:01] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:19:05] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:22:09] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:25:13] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:28:17] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:31:21] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:34:26] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:37:30] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:40:34] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:43:38] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:46:42] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:49:46] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:52:50] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:55:54] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[09:58:58] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:02:03] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:05:07] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:08:11] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:11:15] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:14:19] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:17:23] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:20:27] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:23:31] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:26:35] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:29:39] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:32:44] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:35:48] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:38:52] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:41:56] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:45:00] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:48:04] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:51:08] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:54:12] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[10:57:16] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:00:21] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:03:25] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:06:29] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:09:33] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:12:37] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:15:41] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:18:45] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:21:49] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:24:53] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:27:57] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:31:02] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:34:06] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:37:10] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:40:14] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:43:18] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:46:22] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:49:26] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:52:30] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:55:34] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[11:58:39] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:01:43] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:04:47] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:07:51] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:10:55] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:13:59] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:17:03] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:20:07] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:23:11] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:26:15] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:29:20] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:32:24] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:35:28] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:38:32] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:41:36] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:44:40] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:47:44] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:50:48] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:53:52] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[12:56:56] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:00:01] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:03:05] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:06:09] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:09:13] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:12:17] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:15:21] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:18:25] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:21:29] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:24:33] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:27:38] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:30:42] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:33:46] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:36:50] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:39:54] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:42:58] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:46:02] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:49:06] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:52:10] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:55:14] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[13:58:19] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:01:23] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:04:27] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:05:12] [User Authenticator #0/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[14:05:12] [Server thread/INFO]: [HorriblePlayerLoginEventHack] You have plugins listening to the PlayerLoginEvent, this will cause re-configuration APIs to be unavailable: [LuckPerms]
+[14:05:12] [Server thread/INFO]: beefkeef1 joined the game
+[14:05:12] [Server thread/INFO]: beefkeef1[/72.83.2.139:56090] logged in with entity id 93 at ([Ironman]-140.50491558061634, 67.0, -63.49967958789968)
+[14:07:18] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[14:07:18] [Server thread/INFO]: beefkeef1 left the game
+[14:07:31] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:09:07] [User Authenticator #1/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[14:09:07] [Server thread/INFO]: beefkeef1 joined the game
+[14:09:07] [Server thread/INFO]: beefkeef1[/72.83.2.139:56157] logged in with entity id 556 at ([Ironman]-142.7629941756592, 67.0, -63.947993402445896)
+[14:10:14] [User Authenticator #2/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[14:10:14] [Server thread/INFO]: JackL64 joined the game
+[14:10:14] [Server thread/INFO]: JackL64[/173.93.6.58:51101] logged in with entity id 710 at ([Ironman]-111.76139527094516, 71.0, -26.650505023501328)
+[14:10:20] [Async Chat Thread - #3/INFO]: <JackL64> good morning
+[14:10:21] [Async Chat Thread - #3/INFO]: <beefkeef1> tooop
+[14:10:26] [Async Chat Thread - #3/INFO]: <beefkeef1> of the morning
+[14:10:35] [Server thread/INFO]: There are 2 of a max of 10 players online: beefkeef1, JackL64
+[14:10:49] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[14:10:49] [Server thread/INFO]: JackL64 left the game
+[14:13:39] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:14:02] [User Authenticator #3/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[14:14:02] [Server thread/INFO]: JackL64 joined the game
+[14:14:02] [Server thread/INFO]: JackL64[/173.93.6.58:51211] logged in with entity id 1288 at ([Ironman]-117.98763767840084, 71.0, -33.399271013892374)
+[14:14:51] [Async Chat Thread - #4/INFO]: <beefkeef1> baby zombie on your ass
+[14:15:04] [Async Chat Thread - #4/INFO]: <JackL64> CHICKEN JOCKEYYYYYYYYYYYYY
+[14:15:11] [Server thread/INFO]: JackL64 was slain by Enderman
+[14:15:38] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[14:15:38] [Server thread/INFO]: JackL64 left the game
+[14:16:43] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:18:38] [Server thread/INFO]: beefkeef1 hit the ground too hard while trying to escape Skeleton
+[14:19:47] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:22:51] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:23:47] [User Authenticator #4/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[14:23:47] [Server thread/INFO]: JackL64 joined the game
+[14:23:47] [Server thread/INFO]: JackL64[/173.93.6.58:51530] logged in with entity id 2833 at ([Ironman]-27.5, 66.0, -0.5)
+[14:25:30] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[14:25:30] [Server thread/INFO]: JackL64 left the game
+[14:25:56] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:29:00] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:29:42] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[14:29:42] [Server thread/INFO]: beefkeef1 left the game
+[14:30:29] [User Authenticator #5/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[14:30:30] [Server thread/INFO]: beefkeef1 joined the game
+[14:30:30] [Server thread/INFO]: beefkeef1[/72.83.2.139:56711] logged in with entity id 3821 at ([Ironman]-142.06782938294856, 67.0, -63.27824172422441)
+[14:32:04] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:35:08] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:38:12] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:41:16] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:44:20] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:47:24] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[14:49:57] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[14:49:57] [Server thread/INFO]: beefkeef1 left the game
+[14:50:28] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:53:32] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:56:37] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[14:59:41] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:02:45] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:02:54] [User Authenticator #6/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[15:02:54] [Server thread/INFO]: JackL64 joined the game
+[15:02:54] [Server thread/INFO]: JackL64[/173.93.6.58:52713] logged in with entity id 6300 at ([Ironman]4.243205841673678, 68.5, 148.85889026469323)
+[15:03:45] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[15:03:45] [Server thread/INFO]: JackL64 left the game
+[15:04:07] [User Authenticator #7/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[15:04:07] [Server thread/INFO]: beefkeef1 joined the game
+[15:04:07] [Server thread/INFO]: beefkeef1[/72.83.2.139:57208] logged in with entity id 6660 at ([Ironman]-132.11477415834833, 73.0, -59.436481454575535)
+[15:05:49] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[15:06:59] [User Authenticator #8/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[15:06:59] [Server thread/INFO]: JackL64 joined the game
+[15:06:59] [Server thread/INFO]: JackL64[/173.93.6.58:53233] logged in with entity id 7191 at ([Ironman]-53.19462228552891, 69.0, 235.0183782507733)
+[15:07:12] [Async Chat Thread - #10/INFO]: <JackL64> sorry can you do me a favor and log off for ~20 seconds
+[15:07:54] [Async Chat Thread - #10/INFO]: <JackL64> ?
+[15:07:58] [Async Chat Thread - #10/INFO]: <beefkeef1> ye
+[15:08:00] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[15:08:00] [Server thread/INFO]: beefkeef1 left the game
+[15:08:01] [Async Chat Thread - #10/INFO]: <JackL64> TY
+[15:08:53] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[15:09:19] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[15:09:19] [Server thread/INFO]: JackL64 left the game
+[15:11:19] [User Authenticator #9/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[15:11:19] [Server thread/INFO]: beefkeef1 joined the game
+[15:11:19] [Server thread/INFO]: beefkeef1[/72.83.2.139:57355] logged in with entity id 7799 at ([Ironman]-139.71356460293964, 67.0, -65.47639631681027)
+[15:11:57] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[15:13:53] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[15:13:53] [Server thread/INFO]: beefkeef1 left the game
+[15:15:01] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:18:05] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:21:09] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:24:13] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:27:18] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:30:22] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:33:26] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:36:30] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:39:34] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:42:38] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:42:41] [User Authenticator #10/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[15:42:41] [Server thread/INFO]: JackL64 joined the game
+[15:42:41] [Server thread/INFO]: JackL64[/173.93.6.58:56113] logged in with entity id 8158 at ([Ironman]-67.92687326388716, 64.0, 127.85991197783352)
+[15:44:00] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[15:44:00] [Server thread/INFO]: JackL64 left the game
+[15:45:42] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:48:46] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:51:50] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:53:48] [User Authenticator #11/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[15:53:48] [Server thread/INFO]: beefkeef1 joined the game
+[15:53:48] [Server thread/INFO]: beefkeef1[/72.83.2.139:58505] logged in with entity id 8636 at ([Ironman]-139.72456055693118, 67.0, -64.24995801388405)
+[15:54:36] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[15:54:36] [Server thread/INFO]: beefkeef1 left the game
+[15:54:55] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:57:59] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[15:58:08] [User Authenticator #12/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[15:58:08] [Server thread/INFO]: JackL64 joined the game
+[15:58:08] [Server thread/INFO]: JackL64[/173.93.6.58:59235] logged in with entity id 8774 at ([Ironman]117.46768531312004, 64.0, 251.64932917859701)
+[15:58:32] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[15:58:32] [Server thread/INFO]: JackL64 left the game
+[16:01:03] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:04:07] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:07:11] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:07:24] [User Authenticator #13/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:07:24] [Server thread/INFO]: JackL64 joined the game
+[16:07:24] [Server thread/INFO]: JackL64[/173.93.6.58:60799] logged in with entity id 8920 at ([Ironman]116.3656229159088, 64.0, 252.28948584861104)
+[16:08:09] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:08:09] [Server thread/INFO]: JackL64 left the game
+[16:08:41] [User Authenticator #14/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:08:41] [Server thread/INFO]: JackL64 joined the game
+[16:08:41] [Server thread/INFO]: JackL64[/173.93.6.58:61423] logged in with entity id 9132 at ([Ironman]163.84505061103064, 64.0, 216.36712535718848)
+[16:09:51] [Server thread/INFO]: JackL64 burned to death
+[16:10:15] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[16:10:22] [Server thread/INFO]: JackL64 was shot by Skeleton
+[16:11:53] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:11:53] [Server thread/INFO]: JackL64 left the game
+[16:13:19] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:16:23] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:19:27] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:22:31] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:23:47] [User Authenticator #15/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:23:48] [Server thread/INFO]: JackL64 joined the game
+[16:23:48] [Server thread/INFO]: JackL64[/173.93.6.58:64825] logged in with entity id 9512 at ([Ironman]-52.434979916995495, 68.41999998688698, -1.5269711535038655)
+[16:24:25] [Server thread/INFO]: JackL64 was shot by Skeleton
+[16:24:41] [Server thread/INFO]: JackL64 was shot by Skeleton
+[16:25:00] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:25:00] [Server thread/INFO]: JackL64 left the game
+[16:25:36] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:28:40] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:30:29] [User Authenticator #16/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:30:30] [Server thread/INFO]: JackL64 joined the game
+[16:30:30] [Server thread/INFO]: JackL64[/173.93.6.58:50864] logged in with entity id 9680 at ([Ironman]-27.737982159387023, 69.0, 19.595056576426444)
+[16:31:10] [Server thread/INFO]: JackL64 hit the ground too hard
+[16:31:44] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[16:31:51] [Server thread/INFO]: JackL64 drowned
+[16:32:02] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:32:02] [Server thread/INFO]: JackL64 left the game
+[16:34:48] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:37:52] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:39:44] [User Authenticator #17/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:39:44] [Server thread/INFO]: JackL64 joined the game
+[16:39:44] [Server thread/INFO]: JackL64[/173.93.6.58:52244] logged in with entity id 9883 at ([Ironman]-10.105095070867081, 37.0, -22.393274300279717)
+[16:40:45] [Server thread/INFO]: JackL64 was slain by Spider
+[16:40:56] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[16:41:26] [Server thread/INFO]: JackL64 tried to swim in lava
+[16:41:33] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:41:33] [Server thread/INFO]: JackL64 left the game
+[16:44:00] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:47:04] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:50:08] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:53:13] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:55:57] [User Authenticator #18/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:55:57] [Server thread/INFO]: JackL64 joined the game
+[16:55:57] [Server thread/INFO]: JackL64[/173.93.6.58:61363] logged in with entity id 10305 at ([Ironman]-33.5, 67.0, -0.5)
+[16:56:17] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[16:57:14] [Server thread/INFO]: JackL64 tried to swim in lava
+[16:57:32] [Server thread/INFO]: JackL64 was slain by Spider
+[16:57:50] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[16:57:50] [Server thread/INFO]: JackL64 left the game
+[16:59:21] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[16:59:50] [User Authenticator #19/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[16:59:51] [Server thread/INFO]: JackL64 joined the game
+[16:59:51] [Server thread/INFO]: JackL64[/173.93.6.58:63039] logged in with entity id 10743 at ([Ironman]8.977843052787696, 63.0, 50.954381175286095)
+[17:00:30] [Server thread/INFO]: JackL64 tried to swim in lava
+[17:01:12] [Server thread/INFO]: JackL64 was shot by Skeleton
+[17:02:25] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:05:29] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:08:33] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:11:37] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:14:41] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:17:45] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:20:49] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:22:40] [Server thread/INFO]: JackL64 tried to swim in lava
+[17:23:54] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:24:27] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:24:53] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:26:37] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:26:58] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:27:01] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:28:46] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:29:11] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:30:02] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:32:44] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:33:06] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:33:09] [Server thread/INFO]: JackL64 suffocated in a wall
+[17:35:47] [Server thread/INFO]: JackL64 was slain by Zombie
+[17:35:54] [Server thread/INFO]: JackL64 was slain by Zombie
+[17:36:10] [Server thread/INFO]: There are 1 of a max of 10 players online: JackL64
+[17:36:54] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[17:36:54] [Server thread/INFO]: JackL64 left the game
+[17:39:14] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:42:18] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:45:22] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:48:26] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:51:31] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:54:35] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[17:57:39] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:00:43] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:03:47] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:06:51] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:09:55] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:12:59] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:16:03] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:16:20] [User Authenticator #20/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[18:16:21] [Server thread/INFO]: beefkeef1 joined the game
+[18:16:21] [Server thread/INFO]: beefkeef1[/72.83.2.139:50433] logged in with entity id 11980 at ([Ironman]-140.7037898837227, 67.0, -64.2486926390655)
+[18:17:40] [Server thread/INFO]: beefkeef1 has made the advancement [Take Aim]
+[18:19:07] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:22:12] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:25:16] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:25:32] [Server thread/INFO]: beefkeef1 has made the advancement [Voluntary Exile]
+[18:28:20] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:31:24] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:34:28] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:37:32] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:40:36] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:42:21] [User Authenticator #21/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[18:42:21] [Server thread/INFO]: JackL64 joined the game
+[18:42:21] [Server thread/INFO]: JackL64[/173.93.6.58:52770] logged in with entity id 16966 at ([Ironman]-7.594397254722226, 64.0, -4.540716872166751)
+[18:42:39] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[18:42:39] [Server thread/INFO]: JackL64 left the game
+[18:43:04] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[18:43:04] [Server thread/INFO]: beefkeef1 left the game
+[18:43:40] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[18:46:05] [User Authenticator #22/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[18:46:05] [Server thread/INFO]: beefkeef1 joined the game
+[18:46:05] [Server thread/INFO]: beefkeef1[/72.83.2.139:51101] logged in with entity id 17208 at ([Ironman_nether]10.970340983002853, 67.0, 6.564775100656712)
+[18:46:44] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:48:29] [Server thread/INFO]: beefkeef1 has completed the challenge [Return to Sender]
+[18:49:48] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:52:53] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:55:57] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[18:59:01] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:02:05] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:05:09] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:08:06] [Server thread/INFO]: beefkeef1 lost connection: Disconnected
+[19:08:06] [Server thread/INFO]: beefkeef1 left the game
+[19:08:13] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[19:11:17] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[19:14:21] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[19:17:00] [Server thread/INFO]: Automatic saving is now disabled
+[19:17:03] [Server thread/INFO]: Automatic saving is now enabled
+[19:17:25] [Server thread/INFO]: There are 0 of a max of 10 players online: 
+[19:18:30] [User Authenticator #23/INFO]: UUID of player beefkeef1 is 1028dcbb-59c4-432e-a6a0-de5918d07952
+[19:18:30] [Server thread/INFO]: beefkeef1 joined the game
+[19:18:30] [Server thread/INFO]: beefkeef1[/72.83.2.139:51674] logged in with entity id 20607 at ([Ironman]-147.5, 67.0, -62.5)
+[19:20:30] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:23:34] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:26:38] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1
+[19:28:11] [User Authenticator #24/INFO]: UUID of player JackL64 is 1c1930e2-ef77-4747-9f89-fb9a3ce77cac
+[19:28:11] [Server thread/INFO]: JackL64 joined the game
+[19:28:11] [Server thread/INFO]: JackL64[/173.93.6.58:53899] logged in with entity id 21962 at ([Ironman]-21.972274433231842, 71.0, 32.20448804436649)
+[19:29:04] [Async Chat Thread - #27/INFO]: <beefkeef1> follw me
+[19:29:28] [Async Chat Thread - #27/INFO]: <beefkeef1> thats it
+[19:29:31] [Async Chat Thread - #27/INFO]: <JackL64> neat :)
+[19:29:32] [Async Chat Thread - #27/INFO]: <beefkeef1> bee
+[19:29:41] [Async Chat Thread - #27/INFO]: <beefkeef1> dont u dare
+[19:29:42] [Server thread/INFO]: There are 2 of a max of 10 players online: beefkeef1, JackL64
+[19:29:42] [Async Chat Thread - #27/INFO]: <JackL64> b
+[19:29:45] [Async Chat Thread - #27/INFO]: <JackL64> lol
+[19:29:51] [Server thread/INFO]: JackL64 lost connection: Disconnected
+[19:29:51] [Server thread/INFO]: JackL64 left the game
+[19:32:46] [Server thread/INFO]: There are 1 of a max of 10 players online: beefkeef1

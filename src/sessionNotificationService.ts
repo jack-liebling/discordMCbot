@@ -322,17 +322,18 @@ export class SessionNotificationService {
   private async handleLeaveEvent(sessionEvent: SessionEvent): Promise<void> {
     const { username } = sessionEvent;
 
-    // Always update the player's online status first
+    // Find active JOIN notification for this user BEFORE updating session state
+    // (since findActiveJoinNotification requires is_online = true)
+    const activeNotification = await this.database.findActiveJoinNotification(
+      username,
+      this.config.whoIsOnChannelId
+    );
+
+    // Update the player's online status after finding the notification
     await this.database.updatePlayerSessionState(
       username,
       false,
       sessionEvent.timestamp
-    );
-
-    // Find active JOIN notification for this user
-    const activeNotification = await this.database.findActiveJoinNotification(
-      username,
-      this.config.whoIsOnChannelId
     );
 
     if (!activeNotification) {
