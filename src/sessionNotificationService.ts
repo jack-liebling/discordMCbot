@@ -101,7 +101,46 @@ export class SessionNotificationService {
   ): Promise<void> {
     const { username } = sessionEvent;
 
-    // Check if user is in cooldown period
+    // First, check if there's an existing notification with pending deletion
+    const existingNotification = await this.database.findActiveJoinNotification(
+      username,
+      this.config.whoIsOnChannelId
+    );
+
+    if (existingNotification?.discordMessageId) {
+      // Cancel any pending deletion timeout
+      const timeoutKey = `${username}-${existingNotification.discordMessageId}`;
+      const existingTimeout = this.deletionTimeouts.get(timeoutKey);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        this.deletionTimeouts.delete(timeoutKey);
+        this.logger.debug(
+          "Cancelled pending deletion for existing notification",
+          {
+            username,
+            messageId: existingNotification.discordMessageId,
+          }
+        );
+      }
+
+      // Update database to mark user as online (cancel scheduled deletion)
+      await this.database.recordSessionNotification({
+        username,
+        type: "JOIN",
+        discordMessageId: existingNotification.discordMessageId,
+        discordChannelId: discordChannel.id,
+        discordGuildId: discordChannel.guild.id,
+        expiresAt: new Date(Date.now() + this.config.deletionDelayMs),
+      });
+
+      this.logger.info("User rejoined - existing notification preserved", {
+        username,
+        messageId: existingNotification.discordMessageId,
+      });
+      return;
+    }
+
+    // Check if user is in cooldown period for new notifications
     const cooldownStatus = await this.database.checkSessionCooldown(
       username,
       "JOIN"
@@ -115,7 +154,7 @@ export class SessionNotificationService {
       return;
     }
 
-    // Create and send JOIN notification
+    // Create and send new JOIN notification
     const embed = this.discordFormatter.createSessionJoinEmbed(sessionEvent);
     const content = this.discordFormatter.createSessionNotificationText(
       sessionEvent,
