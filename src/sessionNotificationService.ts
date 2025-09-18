@@ -101,6 +101,13 @@ export class SessionNotificationService {
   ): Promise<void> {
     const { username } = sessionEvent;
 
+    // Always update the player's online status first
+    await this.database.updatePlayerSessionState(
+      username,
+      true,
+      sessionEvent.timestamp
+    );
+
     // First, check if there's an existing notification with pending deletion
     const existingNotification = await this.database.findActiveJoinNotification(
       username,
@@ -202,6 +209,13 @@ export class SessionNotificationService {
   private async handleLeaveEvent(sessionEvent: SessionEvent): Promise<void> {
     const { username } = sessionEvent;
 
+    // Always update the player's online status first
+    await this.database.updatePlayerSessionState(
+      username,
+      false,
+      sessionEvent.timestamp
+    );
+
     // Find active JOIN notification for this user
     const activeNotification = await this.database.findActiveJoinNotification(
       username,
@@ -214,6 +228,12 @@ export class SessionNotificationService {
       });
       return;
     }
+
+    // Immediately update the database to mark notification for deletion
+    await this.database.scheduleNotificationDeletion(
+      username,
+      new Date(Date.now() + this.config.deletionDelayMs)
+    );
 
     // Schedule deletion after configured delay
     const deletionDelay = this.config.deletionDelayMs; // Configurable deletion delay
@@ -230,11 +250,14 @@ export class SessionNotificationService {
       timeoutId
     );
 
-    this.logger.debug("Scheduled JOIN notification deletion", {
-      username,
-      messageId: activeNotification.discordMessageId,
-      deletionDelayMs: deletionDelay,
-    });
+    this.logger.info(
+      "Player marked as offline and scheduled JOIN notification deletion",
+      {
+        username,
+        messageId: activeNotification.discordMessageId,
+        deletionDelayMs: deletionDelay,
+      }
+    );
   }
 
   /**
