@@ -77,8 +77,13 @@ export class SessionNotificationService {
       // Restore pending deletions
       const pendingDeletions = await this.database.getPendingDeletions();
 
+      // Process deletions and count in single pass
+      let restoredTimeouts = 0;
+      let overdueDeleted = 0;
+
       for (const deletion of pendingDeletions) {
         if (deletion.remainingMs > 1000) {
+          restoredTimeouts++;
           // Use 1 second threshold to avoid immediate execution
           // Schedule the timeout
           const timeoutId = setTimeout(async () => {
@@ -117,6 +122,7 @@ export class SessionNotificationService {
             remainingSeconds: Math.ceil(deletion.remainingMs / 1000),
           });
         } else {
+          overdueDeleted++;
           // Already expired, delete immediately
           try {
             const notification = await this.database.findActiveJoinNotification(
@@ -145,10 +151,8 @@ export class SessionNotificationService {
       }
 
       this.logger.info("SessionNotificationService initialization complete", {
-        restoredTimeouts: pendingDeletions.filter((d) => d.remainingMs > 0)
-          .length,
-        overdueDeleted: pendingDeletions.filter((d) => d.remainingMs <= 0)
-          .length,
+        restoredTimeouts,
+        overdueDeleted,
       });
     } catch (error) {
       this.logger.error("Failed to initialize SessionNotificationService", {

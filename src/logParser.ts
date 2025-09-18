@@ -408,24 +408,26 @@ export class LogParserService {
       tempDate.getTime() - currentOffset * 60 * 1000
     );
 
-    // Log the raw parsing for debugging timezone issues
-    this.logger.debug(
-      `Parsed log timestamp: ${
-        timestampMatch[1]
-      } -> ${logTimestamp.toISOString()}`,
-      {
-        rawTime: timestampMatch[1],
-        serverDate: todayInServerTz,
-        timeString: timeStr,
-        tempUTC: tempDate.toISOString(),
-        finalISO: logTimestamp.toISOString(),
-        finalLocal: logTimestamp.toLocaleString(),
-        timezone: configuredTimezone,
-        systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        offsetMinutes: currentOffset,
-        isDST: currentOffset !== janOffset, // DST active when offset differs from January (standard time)
-      }
-    );
+    // Log the raw parsing for debugging timezone issues, but only if specifically enabled
+    if (process.env.LOG_TIMESTAMP_DEBUG === "1") {
+      this.logger.debug(
+        `Parsed log timestamp: ${
+          timestampMatch[1]
+        } -> ${logTimestamp.toISOString()}`,
+        {
+          rawTime: timestampMatch[1],
+          serverDate: todayInServerTz,
+          timeString: timeStr,
+          tempUTC: tempDate.toISOString(),
+          finalISO: logTimestamp.toISOString(),
+          finalLocal: logTimestamp.toLocaleString(),
+          timezone: configuredTimezone,
+          systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          offsetMinutes: currentOffset,
+          isDST: currentOffset !== janOffset, // DST active when offset differs from January (standard time)
+        }
+      );
+    }
 
     return logTimestamp;
   }

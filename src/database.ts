@@ -936,15 +936,15 @@ export class DatabaseService {
       );
 
       const now = new Date();
-      return result.rows.map((row) => ({
-        username: row.username,
-        discordMessageId: row.notification_message_id,
-        deleteScheduledAt: new Date(row.delete_scheduled_at),
-        remainingMs: Math.max(
-          0,
-          new Date(row.delete_scheduled_at).getTime() - now.getTime()
-        ),
-      }));
+      return result.rows.map((row) => {
+        const deleteScheduledAt = new Date(row.delete_scheduled_at);
+        return {
+          username: row.username,
+          discordMessageId: row.notification_message_id,
+          deleteScheduledAt,
+          remainingMs: Math.max(0, deleteScheduledAt.getTime() - now.getTime()),
+        };
+      });
     } catch (error) {
       this.logger.error("Failed to get pending deletions", { error });
       throw error;
