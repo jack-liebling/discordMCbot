@@ -255,23 +255,44 @@ export class SessionNotificationService {
         );
       }
 
+      this.logger.info("Found existing notification - preparing to preserve", {
+        username,
+        messageId: existingNotification.discordMessageId,
+        currentExpiration: existingNotification.expiresAt?.toISOString(),
+        hadPendingTimeout: !!existingTimeout,
+      });
+
       // Cancel scheduled deletion in database
       await this.database.cancelScheduledDeletion(username);
 
+      this.logger.debug("Cancelled scheduled deletion in database", {
+        username,
+        messageId: existingNotification.discordMessageId,
+      });
+
       // Update existing notification expiration time to extend its lifecycle
+      const newExpirationTime = new Date(
+        Date.now() + this.config.deletionDelayMs
+      );
+
       await this.database.recordSessionNotification({
         username,
         type: "JOIN",
         discordMessageId: existingNotification.discordMessageId,
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
-        expiresAt: new Date(Date.now() + this.config.deletionDelayMs),
+        expiresAt: newExpirationTime,
         timestamp: sessionEvent.timestamp, // Use actual event timestamp
       });
 
       this.logger.info("User rejoined - existing notification preserved", {
         username,
         messageId: existingNotification.discordMessageId,
+        channelId: discordChannel.id,
+        channelName: discordChannel.name,
+        oldExpiration: existingNotification.expiresAt?.toISOString(),
+        newExpiration: newExpirationTime.toISOString(),
+        extensionMinutes: this.config.deletionDelayMs / 60000,
       });
       return;
     }
@@ -297,10 +318,40 @@ export class SessionNotificationService {
       this.config.craftersRoleId
     );
 
+    this.logger.info("Preparing to send JOIN notification to Discord", {
+      username,
+      channelId: discordChannel.id,
+      channelName: discordChannel.name,
+      guildId: discordChannel.guild.id,
+      guildName: discordChannel.guild.name,
+      hasContent: !!content,
+      contentLength: content?.length || 0,
+      hasEmbed: !!embed,
+      embedTitle: embed?.data?.title,
+      craftersRoleId: this.config.craftersRoleId,
+    });
+
     try {
+      this.logger.debug("Sending Discord message", {
+        username,
+        content:
+          content?.substring(0, 100) +
+          (content && content.length > 100 ? "..." : ""),
+        embedFieldCount: embed?.data?.fields?.length || 0,
+      });
+
       const message = await discordChannel.send({
         content,
         embeds: [embed],
+      });
+
+      this.logger.info("Discord message sent successfully", {
+        username,
+        messageId: message.id,
+        channelId: discordChannel.id,
+        guildId: discordChannel.guild.id,
+        url: message.url,
+        timestamp: message.createdAt.toISOString(),
       });
 
       // Record the notification in database
@@ -314,7 +365,19 @@ export class SessionNotificationService {
         timestamp: sessionEvent.timestamp, // Use actual event timestamp from logs
       };
 
+      this.logger.debug("Recording notification in database", {
+        username,
+        messageId: message.id,
+        expiresAt: notificationData.expiresAt?.toISOString(),
+        timestamp: notificationData.timestamp?.toISOString(),
+      });
+
       await this.database.recordSessionNotification(notificationData);
+
+      this.logger.debug("Updating session cooldown", {
+        username,
+        type: "JOIN",
+      });
 
       // Update cooldown
       await this.database.updateSessionCooldown(username, "JOIN");
@@ -323,12 +386,19 @@ export class SessionNotificationService {
         username,
         messageId: message.id,
         channelId: discordChannel.id,
+        channelName: discordChannel.name,
+        expirationTime: notificationData.expiresAt?.toISOString(),
+        deletionDelayMinutes: this.config.deletionDelayMs / 60000,
       });
     } catch (error) {
       this.logger.error("Failed to post JOIN notification", {
         error,
         username,
         channelId: discordChannel.id,
+        channelName: discordChannel.name,
+        guildId: discordChannel.guild.id,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorStack: error instanceof Error ? error.stack : undefined,
       });
     }
   }
