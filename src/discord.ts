@@ -1,6 +1,6 @@
 // T011: Discord message formatter creating death announcement embeds
 import { EmbedBuilder, ColorResolvable } from "discord.js";
-import { DeathEvent } from "./types";
+import { DeathEvent, SessionEvent } from "./types";
 import { Logger } from "./logger";
 
 export class DiscordFormatter {
@@ -93,6 +93,37 @@ export class DiscordFormatter {
     this.logger.debug("Created shutdown message embed");
 
     return embed;
+  }
+
+  createSessionJoinEmbed(sessionEvent: SessionEvent): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setTitle("🟢 Player Joined")
+      .setDescription(`**${sessionEvent.username}** joined the server`)
+      .setColor(0x00ff00 as ColorResolvable) // Green color
+      .addFields({
+        name: "Join Time",
+        value: this.formatTimestamp(sessionEvent.timestamp),
+        inline: true,
+      })
+      .setFooter({ text: `${this.serverName} • Welcome!` })
+      .setTimestamp(sessionEvent.timestamp);
+
+    this.logger.debug("Created session join embed", {
+      username: sessionEvent.username,
+      timestamp: sessionEvent.timestamp,
+    });
+
+    return embed;
+  }
+
+  createSessionNotificationText(
+    sessionEvent: SessionEvent,
+    roleId: string
+  ): string {
+    const roleTag = `<@&${roleId}>`;
+    const playerName = this.truncatePlayerName(sessionEvent.username);
+
+    return `${roleTag} **${playerName}** joined the server!`;
   }
 
   private formatTimestamp(timestamp: Date): string {

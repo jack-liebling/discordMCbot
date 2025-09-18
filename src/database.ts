@@ -10,14 +10,18 @@ import {
   DeathEvent,
   Migration,
   SchemaVersion,
+  SessionNotificationData,
+  NotificationRecord,
+  CooldownStatus,
 } from "./types";
 import { Logger } from "./logger";
+import { SESSION_NOTIFICATION_CONSTANTS } from "./config";
 
 export class DatabaseService {
-  private pool: Pool;
-  private logger = Logger.getInstance();
+  private readonly pool: Pool;
+  private readonly logger = Logger.getInstance();
   private static instance: DatabaseService;
-  private static readonly CURRENT_SCHEMA_VERSION = 2; // Version 2 includes activity tracking
+  private static readonly CURRENT_SCHEMA_VERSION = 3; // Version 3 includes session notifications
 
   constructor(databaseUrl?: string) {
     this.pool = new Pool({
@@ -344,6 +348,72 @@ export class DatabaseService {
             UPDATE players 
             SET last_seen_timestamp = COALESCE(last_death_timestamp, last_updated)
             WHERE last_seen_timestamp = last_updated
+          `);
+        },
+      },
+      {
+        version: 3,
+        name: "session_notifications",
+        description:
+          "Add session notification tracking with player_session_notifications and player_session_cooldowns tables",
+        up: async (client: PoolClient) => {
+          // Create player_session_notifications table
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS player_session_notifications (
+              username VARCHAR(255) PRIMARY KEY,
+              is_online BOOLEAN NOT NULL DEFAULT false,
+              last_join_timestamp TIMESTAMPTZ,
+              last_leave_timestamp TIMESTAMPTZ,
+              notification_message_id VARCHAR(255),
+              delete_scheduled_at TIMESTAMPTZ,
+              status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'scheduled_for_deletion', 'deleted', 'failed')),
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              
+              -- Foreign key to existing players table  
+              CONSTRAINT fk_session_player 
+                FOREIGN KEY (username) 
+                REFERENCES players(username) 
+                ON DELETE CASCADE
+            )
+          `);
+
+          // Create player_session_cooldowns table
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS player_session_cooldowns (
+              username VARCHAR(255) PRIMARY KEY,
+              last_join_notification TIMESTAMPTZ,
+              cooldown_expires_at TIMESTAMPTZ,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              
+              -- Foreign key to existing players table
+              CONSTRAINT fk_cooldown_player 
+                FOREIGN KEY (username) 
+                REFERENCES players(username) 
+                ON DELETE CASCADE
+            )
+          `);
+
+          // Indexes for performance
+          await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_session_online ON player_session_notifications (is_online)
+          `);
+
+          await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_session_status ON player_session_notifications (status)
+          `);
+
+          await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_session_delete_scheduled ON player_session_notifications (delete_scheduled_at)
+          `);
+
+          await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_session_message ON player_session_notifications (notification_message_id)
+          `);
+
+          await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_cooldown_expires ON player_session_cooldowns (cooldown_expires_at)
           `);
         },
       },
@@ -676,6 +746,330 @@ export class DatabaseService {
     } catch (error) {
       this.logger.error("Database connection test failed", error);
       return false;
+    }
+  }
+
+  // Session notification methods
+
+  /**
+   * Record a session notification with Discord message reference
+   */
+  public async recordSessionNotification(
+    data: SessionNotificationData
+  ): Promise<NotificationRecord> {
+    const client = await this.pool.connect();
+    try {
+      const expiresAt =
+        data.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours default
+
+      const result = await client.query(
+        `
+        INSERT INTO player_session_notifications 
+        (username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        ON CONFLICT (username) 
+        DO UPDATE SET 
+          is_online = $2,
+          notification_message_id = $3,
+          delete_scheduled_at = $4,
+          status = $5,
+          updated_at = NOW()
+        RETURNING username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
+        `,
+        [
+          data.username,
+          data.type === "JOIN",
+          data.discordMessageId,
+          data.type === "JOIN" ? null : expiresAt,
+          "active",
+        ]
+      );
+
+      return {
+        username: result.rows[0].username,
+        type: data.type,
+        discordMessageId: result.rows[0].notification_message_id,
+        discordChannelId: data.discordChannelId,
+        discordGuildId: data.discordGuildId,
+        createdAt: result.rows[0].created_at,
+        expiresAt: expiresAt,
+        isDeleted: false,
+      };
+    } catch (error) {
+      this.logger.error("Failed to record session notification", {
+        error,
+        data,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Find active JOIN notification for LEAVE event deletion
+   */
+  public async findActiveJoinNotification(
+    username: string,
+    channelId: string
+  ): Promise<NotificationRecord | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
+        FROM player_session_notifications
+        WHERE username = $1 AND is_online = true AND notification_message_id IS NOT NULL AND status = 'active'
+        `,
+        [username]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        username: row.username,
+        type: "JOIN",
+        discordMessageId: row.notification_message_id,
+        discordChannelId: channelId,
+        discordGuildId: "", // Will be filled by caller
+        createdAt: row.created_at,
+        expiresAt:
+          row.delete_scheduled_at || new Date(Date.now() + 24 * 60 * 60 * 1000),
+        isDeleted: false,
+      };
+    } catch (error) {
+      this.logger.error("Failed to find active join notification", {
+        error,
+        username,
+        channelId,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Mark notification as deleted (set discord_message_id to null)
+   */
+  public async markNotificationDeleted(username: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        UPDATE player_session_notifications 
+        SET notification_message_id = NULL, status = 'deleted', updated_at = NOW()
+        WHERE username = $1
+        `,
+        [username]
+      );
+
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      this.logger.error("Failed to mark notification deleted", {
+        error,
+        username,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Schedule notification for deletion
+   */
+  public async scheduleNotificationDeletion(
+    username: string,
+    deleteAt: Date
+  ): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        UPDATE player_session_notifications 
+        SET delete_scheduled_at = $2, status = 'scheduled_for_deletion', is_online = false, updated_at = NOW()
+        WHERE username = $1
+        `,
+        [username, deleteAt]
+      );
+
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      this.logger.error("Failed to schedule notification deletion", {
+        error,
+        username,
+        deleteAt,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Remove expired notification records (automated cleanup)
+   */
+  public async cleanupExpiredNotifications(): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        DELETE FROM player_session_notifications 
+        WHERE delete_scheduled_at IS NOT NULL AND delete_scheduled_at < NOW()
+        `
+      );
+
+      this.logger.info(
+        `Cleaned up ${result.rowCount || 0} expired session notifications`
+      );
+      return result.rowCount || 0;
+    } catch (error) {
+      this.logger.error("Failed to cleanup expired notifications", { error });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Check if player is in cooldown period
+   */
+  public async checkSessionCooldown(
+    username: string,
+    eventType: "JOIN" | "LEAVE"
+  ): Promise<CooldownStatus> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT last_join_notification, cooldown_expires_at
+        FROM player_session_cooldowns
+        WHERE username = $1
+        `,
+        [username]
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          inCooldown: false,
+          remainingSeconds: 0,
+          consecutiveEvents: 0,
+          lastEventAt: null,
+        };
+      }
+
+      const row = result.rows[0];
+      const now = new Date();
+      const cooldownExpires = row.cooldown_expires_at
+        ? new Date(row.cooldown_expires_at)
+        : null;
+
+      const inCooldown = cooldownExpires && cooldownExpires > now;
+      const remainingSeconds = inCooldown
+        ? Math.ceil((cooldownExpires.getTime() - now.getTime()) / 1000)
+        : 0;
+
+      return {
+        inCooldown: inCooldown || false,
+        remainingSeconds,
+        consecutiveEvents: 1, // Simplified for MVP
+        lastEventAt: row.last_join_notification
+          ? new Date(row.last_join_notification)
+          : null,
+      };
+    } catch (error) {
+      this.logger.error("Failed to check session cooldown", {
+        error,
+        username,
+        eventType,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update cooldown state after session event
+   */
+  public async updateSessionCooldown(
+    username: string,
+    eventType: "JOIN" | "LEAVE"
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      if (eventType === "JOIN") {
+        const cooldownExpires = new Date(
+          Date.now() +
+            SESSION_NOTIFICATION_CONSTANTS.DEFAULT_COOLDOWN_SECONDS * 1000
+        ); // Configurable cooldown duration
+
+        await client.query(
+          `
+          INSERT INTO player_session_cooldowns (username, last_join_notification, cooldown_expires_at, updated_at)
+          VALUES ($1, NOW(), $2, NOW())
+          ON CONFLICT (username)
+          DO UPDATE SET 
+            last_join_notification = NOW(),
+            cooldown_expires_at = $2,
+            updated_at = NOW()
+          `,
+          [username, cooldownExpires]
+        );
+      }
+      // For LEAVE events, we don't update cooldown since it only applies to JOIN notifications
+    } catch (error) {
+      this.logger.error("Failed to update session cooldown", {
+        error,
+        username,
+        eventType,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get all active (non-deleted) session notifications
+   */
+  public async getActiveSessionNotifications(
+    channelId?: string
+  ): Promise<NotificationRecord[]> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
+        FROM player_session_notifications
+        WHERE notification_message_id IS NOT NULL AND status IN ('active', 'scheduled_for_deletion')
+        ORDER BY created_at DESC
+        `
+      );
+
+      return result.rows.map((row) => ({
+        username: row.username,
+        type: "JOIN" as const,
+        discordMessageId: row.notification_message_id,
+        discordChannelId: channelId || "",
+        discordGuildId: "",
+        createdAt: row.created_at,
+        expiresAt:
+          row.delete_scheduled_at || new Date(Date.now() + 24 * 60 * 60 * 1000),
+        isDeleted: row.notification_message_id === null,
+      }));
+    } catch (error) {
+      this.logger.error("Failed to get active session notifications", {
+        error,
+        channelId,
+      });
+      throw error;
+    } finally {
+      client.release();
     }
   }
 }

@@ -7,6 +7,7 @@ import {
   Routes,
   SlashCommandBuilder,
   ChatInputCommandInteraction,
+  TextChannel,
 } from "discord.js";
 import { ConfigLoader } from "./config";
 import { HybridStorageService } from "./hybridStorage";
@@ -16,6 +17,7 @@ import { AnnouncementService } from "./announcer";
 import { LogParserService } from "./logParser";
 import { LeaderboardService } from "./leaderboardService";
 import { SchedulerService } from "./schedulerService";
+import { SessionNotificationService } from "./sessionNotificationService";
 import { Logger } from "./logger";
 
 export class DiscordBot {
@@ -31,6 +33,7 @@ export class DiscordBot {
   private logParserService?: LogParserService;
   private leaderboardService!: LeaderboardService;
   private schedulerService!: SchedulerService;
+  private sessionNotificationService?: SessionNotificationService;
 
   // State
   private isInitialized = false;
@@ -156,6 +159,47 @@ export class DiscordBot {
 
       this.logger.info("Log-based death detection enabled");
 
+      // Initialize session notification service if enabled
+      const sessionConfig = this.configLoader.getSessionNotificationConfig();
+      if (sessionConfig) {
+        this.sessionNotificationService = new SessionNotificationService(
+          this.storageService.getDatabaseService(),
+          this.formatter,
+          this.client,
+          sessionConfig
+        );
+
+        // Register session event callback with log parser
+        this.logParserService.addSessionEventCallback(async (sessionEvent) => {
+          if (this.sessionNotificationService) {
+            // Get the "who-is-on" channel
+            const channel = await this.client.channels.fetch(
+              sessionConfig.whoIsOnChannelId
+            );
+            if (channel?.isTextBased() && "guild" in channel) {
+              await this.sessionNotificationService.handleSessionEvent(
+                sessionEvent,
+                channel as TextChannel
+              );
+            } else {
+              this.logger.warn(
+                "Session notification channel not found or not text-based",
+                {
+                  channelId: sessionConfig.whoIsOnChannelId,
+                }
+              );
+            }
+          }
+        });
+
+        this.logger.info("Session notification service enabled", {
+          channelId: sessionConfig.whoIsOnChannelId,
+          roleId: sessionConfig.craftersRoleId,
+        });
+      } else {
+        this.logger.info("Session notifications disabled or not configured");
+      }
+
       // Initialize announcement service
       await this.announcementService.initialize();
 
@@ -210,6 +254,11 @@ export class DiscordBot {
     try {
       this.logger.info("Shutting down Discord bot...");
 
+      // Stop session notification service if running
+      if (this.sessionNotificationService) {
+        this.sessionNotificationService.cleanup();
+      }
+
       // Stop scheduler service
       if (this.schedulerService) {
         await this.schedulerService.stop();
@@ -241,6 +290,7 @@ export class DiscordBot {
     uptime: number;
     logParserConnected: boolean;
     announcementServiceReady: boolean;
+    sessionNotificationsEnabled: boolean;
   } {
     return {
       isConnected: this.isConnected,
@@ -249,6 +299,8 @@ export class DiscordBot {
       logParserConnected: this.logParserService !== undefined,
       announcementServiceReady:
         this.announcementService?.isServiceReady() || false,
+      sessionNotificationsEnabled:
+        this.sessionNotificationService !== undefined,
     };
   }
 

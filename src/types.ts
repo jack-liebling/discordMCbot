@@ -88,6 +88,11 @@ export interface EnvironmentConfig {
   LOG_CHECK_INTERVAL?: string;
   TIMEZONE?: string;
   DATABASE_URL?: string;
+  // Session notification configuration
+  SESSION_NOTIFICATIONS_ENABLED?: string;
+  CRAFTERS_ROLE_ID?: string;
+  WHO_IS_ON_CHANNEL_ID?: string;
+  SESSION_COOLDOWN_SECONDS?: string;
 }
 
 // FTP configuration
@@ -268,3 +273,63 @@ export interface SchemaVersion {
   success: boolean;
   error_message?: string;
 }
+
+// Session notification types
+export interface SessionEvent {
+  type: "JOIN" | "LEAVE";
+  username: string;
+  timestamp: Date;
+  rawLogLine: string;
+}
+
+export interface NotificationRecord {
+  id?: number;
+  username: string;
+  type: "JOIN" | "LEAVE";
+  discordMessageId: string | null;
+  discordChannelId: string;
+  discordGuildId: string;
+  createdAt: Date;
+  expiresAt: Date;
+  isDeleted: boolean;
+}
+
+export interface CooldownStatus {
+  inCooldown: boolean;
+  remainingSeconds: number;
+  consecutiveEvents: number;
+  lastEventAt: Date | null;
+}
+
+export interface SessionChannelConfig {
+  guildId: string;
+  channelId: string;
+  craftersRoleId: string;
+  enabled: boolean;
+}
+
+export interface MessageReference {
+  messageId: string;
+  channelId: string;
+  guildId: string;
+  timestamp: Date;
+}
+
+export interface SessionNotificationData {
+  username: string;
+  type: "JOIN" | "LEAVE";
+  discordMessageId: string;
+  discordChannelId: string;
+  discordGuildId: string;
+  expiresAt?: Date;
+}
+
+export interface SessionHistoryRecord {
+  username: string;
+  type: "JOIN" | "LEAVE";
+  timestamp: Date;
+  discordChannelId: string;
+  messagePosted: boolean;
+}
+
+export type SessionEventCallback = (event: SessionEvent) => Promise<void>;

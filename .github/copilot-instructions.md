@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Discord bot application that monitors Minecraft server deaths via FTP log parsing and announces them in Discord channels. Built for small friend groups with focus on simplicity and reliability.
+Discord bot application that monitors Minecraft ser9. 📋 Player session notifications with @Crafters role mentions (JOIN-only with delayed deletion) 10. 📋 Discord message lifecycle management for JOIN notificationsr activity via FTP log parsing, announcing deaths and player session events (join/leave) in Discord channels. Built for small friend groups with focus on simplicity and reliability. Features @Crafters role mentions for player activity notifications.
 
 ## Tech Stack
 
@@ -26,25 +26,29 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 
 - **DeathEvent**: Player death with timestamp, cause, experience level
 - **Player**: Persistent death statistics, rate limiting data, and activity tracking
+- **PlayerSessionState**: Session event tracking with JOIN/LEAVE timestamps and cooldown management
+- **NotificationMessage**: Discord message references for session notification lifecycle management
+- **SessionCooldown**: Rate limiting for rapid join/leave cycles (2-minute base cooldown)
 - **DailyLeaderboard**: Ranked player death counts with survival champion
 - **SurvivalChampion**: Longest-surviving active player (within 7 days)
-- **DiscordChannelConfig**: Channel settings for announcements
+- **DiscordChannelConfig**: Channel settings for announcements including "who-is-on" channel
 - **FtpConfig**: FTP server connection details for log access
 - **LogProcessingState**: Tracks processed log positions across restarts
 - **LeaderboardConfig**: Daily announcement scheduling and state
 
 ## Key Implementation Notes
 
-- Use Discord embeds for structured death announcements
-- FTP log parsing every 10 seconds for accurate death detection with real causes
-- Rate limit: ignore deaths <5 seconds apart from same player (reduced from 30)
-- Comprehensive death message parsing with regex patterns
+- Use Discord embeds for structured death and session announcements
+- FTP log parsing every 10 seconds for accurate event detection (deaths and JOIN/LEAVE)
+- Death rate limit: ignore deaths <5 seconds apart from same player
+- Session rate limit: 2-minute cooldown for rapid JOIN notification cycles
+- @Crafters role mentions for JOIN notifications in "who-is-on" channel
+- JOIN-only notifications with 2-minute delayed deletion after LEAVE events
+- Comprehensive event message parsing with regex patterns (deaths, joins, leaves)
 - Environment variables for all secrets (tokens, passwords, FTP credentials, database connection)
 - Auto-reconnection logic for FTP connections
 - Database persistence prevents duplicate announcements on bot restart
 - JSON file fallback system for when database is unavailable
-- Comprehensive player activity tracking beyond deaths (join, leave, chat, achievements)
-- Activity-specific rate limiting and database schema with player_activities table
 - **Example log file**: `example_latest.log` contains sample Minecraft server logs for testing and context
 
 ## File Structure
@@ -78,6 +82,10 @@ src/
 - 2025-09-17: Removed RCON dependency entirely - now FTP-only architecture
 - 2025-09-17: Migrated from JSON file storage to remote PostgreSQL database via Railway
 - 2025-09-17: Planned daily death leaderboard feature with survival champion tracking
+- 2025-01-14: Added player session notification feature (JOIN-only events)
+- 2025-01-14: Implemented @Crafters role mentions in "who-is-on" Discord channel
+- 2025-01-14: Added 2-minute cooldown protection against rapid JOIN notification cycles
+- 2025-01-14: Created delayed deletion system (JOIN messages deleted 2 minutes after LEAVE)
 
 ## Constitutional Requirements
 
@@ -97,4 +105,5 @@ src/
 6. ✅ RCON removal - simplified FTP-only architecture
 7. ✅ Migrated from JSON file storage to remote PostgreSQL database via Railway
 8. 🔄 Daily death leaderboard with survival champion tracking
-9. 🔄 Enhanced player activity tracking (join, leave, chat, achievements, deaths)
+9. � Player session notifications with @Crafters role mentions (planned for implementation)
+10. 📋 Discord message lifecycle management for JOIN/LEAVE events

@@ -435,4 +435,16 @@ export class HybridStorageService implements IStorageService {
       await this.fallbackToJson();
     }
   }
+
+  /**
+   * Get the database service instance (for session notifications)
+   */
+  getDatabaseService(): DatabaseService {
+    if (!this.dbService) {
+      throw new Error(
+        "Database service not available - session notifications require database storage"
+      );
+    }
+    return this.dbService;
+  }
 }
