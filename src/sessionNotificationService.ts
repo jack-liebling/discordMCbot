@@ -231,20 +231,6 @@ export class SessionNotificationService {
       return;
     }
 
-    // Update the database to mark notification as scheduled for deletion using the Discord message ID
-    if (activeNotification.discordMessageId) {
-      await this.database.recordSessionNotification({
-        username,
-        type: "LEAVE",
-        discordMessageId: activeNotification.discordMessageId,
-        discordChannelId:
-          activeNotification.discordChannelId || this.config.whoIsOnChannelId,
-        discordGuildId: activeNotification.discordGuildId || "",
-        expiresAt: new Date(Date.now() + this.config.deletionDelayMs),
-        timestamp: sessionEvent.timestamp,
-      });
-    }
-
     // Schedule deletion after configured delay
     const deletionDelay = this.config.deletionDelayMs; // Configurable deletion delay
     const timeoutId = setTimeout(async () => {

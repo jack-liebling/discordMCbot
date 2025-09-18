@@ -780,13 +780,13 @@ export class DatabaseService {
         RETURNING username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
         `,
         [
-          data.username,
-          data.type === "JOIN",
-          data.type === "JOIN" ? eventTimestamp : null, // use actual event timestamp for JOIN events
-          data.discordMessageId,
-          data.type === "JOIN" ? null : expiresAt,
-          "active",
-          data.type === "LEAVE" ? eventTimestamp : null, // use actual event timestamp for LEAVE events
+          data.username, // $1
+          data.type === "JOIN", // $2 - is_online boolean
+          data.type === "JOIN" ? eventTimestamp : null, // $3 - join timestamp
+          data.discordMessageId, // $4
+          data.type === "JOIN" ? null : expiresAt, // $5 - delete_scheduled_at
+          "active", // $6 - status
+          data.type === "LEAVE" ? eventTimestamp : null, // $7 - leave timestamp
         ]
       );
 
