@@ -78,7 +78,8 @@ export class SessionNotificationService {
       const pendingDeletions = await this.database.getPendingDeletions();
 
       for (const deletion of pendingDeletions) {
-        if (deletion.remainingMs > 0) {
+        if (deletion.remainingMs > 1000) {
+          // Use 1 second threshold to avoid immediate execution
           // Schedule the timeout
           const timeoutId = setTimeout(async () => {
             try {

@@ -395,9 +395,7 @@ export class LogParserService {
 
     // Calculate timezone offset for the configured timezone
     const jan = new Date(tempDate.getFullYear(), 0, 1);
-    const jul = new Date(tempDate.getFullYear(), 6, 1);
     const janOffset = this.getTimezoneOffsetForDate(jan, configuredTimezone);
-    const julOffset = this.getTimezoneOffsetForDate(jul, configuredTimezone);
 
     // Use the current offset (accounting for DST)
     const currentOffset = this.getTimezoneOffsetForDate(
@@ -425,7 +423,7 @@ export class LogParserService {
         timezone: configuredTimezone,
         systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         offsetMinutes: currentOffset,
-        isDST: currentOffset !== janOffset || currentOffset !== julOffset,
+        isDST: currentOffset !== janOffset, // DST active when offset differs from January (standard time)
       }
     );
 
@@ -436,14 +434,63 @@ export class LogParserService {
    * Get timezone offset in minutes for a specific date and timezone
    */
   private getTimezoneOffsetForDate(date: Date, timezone: string): number {
-    // Create two Date objects - one in UTC and one in the target timezone
-    const utcTime = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
-    const tzTime = new Date(
-      date.toLocaleString("en-US", { timeZone: timezone })
+    // Get the time parts in UTC
+    const utcParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(date);
+
+    // Get the time parts in the target timezone
+    const tzParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(date);
+
+    // Helper to extract values from formatToParts
+    function getParts(parts: Intl.DateTimeFormatPart[]) {
+      const get = (type: string) => parts.find((p) => p.type === type)?.value;
+      return {
+        year: Number(get("year")),
+        month: Number(get("month")),
+        day: Number(get("day")),
+        hour: Number(get("hour")),
+        minute: Number(get("minute")),
+        second: Number(get("second")),
+      };
+    }
+
+    const utc = getParts(utcParts);
+    const tz = getParts(tzParts);
+
+    // Create Date objects from the extracted parts
+    const utcDate = new Date(
+      Date.UTC(
+        utc.year,
+        utc.month - 1,
+        utc.day,
+        utc.hour,
+        utc.minute,
+        utc.second
+      )
+    );
+    const tzDate = new Date(
+      Date.UTC(tz.year, tz.month - 1, tz.day, tz.hour, tz.minute, tz.second)
     );
 
-    // Calculate the difference in minutes
-    return (tzTime.getTime() - utcTime.getTime()) / (1000 * 60);
+    // The offset is the difference in minutes between the target timezone and UTC
+    return (tzDate.getTime() - utcDate.getTime()) / (1000 * 60);
   }
 
   private parseDeathMessage(logLine: string): DeathEvent | null {
