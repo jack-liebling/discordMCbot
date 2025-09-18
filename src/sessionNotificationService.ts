@@ -55,6 +55,109 @@ export class SessionNotificationService {
   }
 
   /**
+   * Initialize the service and restore pending deletions from database
+   */
+  async initialize(): Promise<void> {
+    if (!this.config.enabled) {
+      this.logger.info(
+        "Session notifications disabled - skipping initialization"
+      );
+      return;
+    }
+
+    try {
+      // First, clean up any expired notifications
+      const cleanedCount = await this.database.cleanupExpiredNotifications();
+      if (cleanedCount > 0) {
+        this.logger.info(
+          `Cleaned up ${cleanedCount} expired notifications on startup`
+        );
+      }
+
+      // Restore pending deletions
+      const pendingDeletions = await this.database.getPendingDeletions();
+
+      for (const deletion of pendingDeletions) {
+        if (deletion.remainingMs > 0) {
+          // Schedule the timeout
+          const timeoutId = setTimeout(async () => {
+            try {
+              const notification =
+                await this.database.findActiveJoinNotification(
+                  deletion.username,
+                  this.config.whoIsOnChannelId
+                );
+
+              if (notification) {
+                await this.deleteNotificationMessage(notification);
+              }
+            } catch (error) {
+              this.logger.error("Failed to execute restored deletion timeout", {
+                error,
+                username: deletion.username,
+                messageId: deletion.discordMessageId,
+              });
+            }
+
+            this.deletionTimeouts.delete(
+              `${deletion.username}-${deletion.discordMessageId}`
+            );
+          }, deletion.remainingMs);
+
+          // Store timeout reference
+          this.deletionTimeouts.set(
+            `${deletion.username}-${deletion.discordMessageId}`,
+            timeoutId
+          );
+
+          this.logger.info("Restored deletion timeout", {
+            username: deletion.username,
+            messageId: deletion.discordMessageId,
+            remainingSeconds: Math.ceil(deletion.remainingMs / 1000),
+          });
+        } else {
+          // Already expired, delete immediately
+          try {
+            const notification = await this.database.findActiveJoinNotification(
+              deletion.username,
+              this.config.whoIsOnChannelId
+            );
+
+            if (notification) {
+              await this.deleteNotificationMessage(notification);
+              this.logger.info("Deleted overdue notification on startup", {
+                username: deletion.username,
+                messageId: deletion.discordMessageId,
+              });
+            }
+          } catch (error) {
+            this.logger.error(
+              "Failed to delete overdue notification on startup",
+              {
+                error,
+                username: deletion.username,
+                messageId: deletion.discordMessageId,
+              }
+            );
+          }
+        }
+      }
+
+      this.logger.info("SessionNotificationService initialization complete", {
+        restoredTimeouts: pendingDeletions.filter((d) => d.remainingMs > 0)
+          .length,
+        overdueDeleted: pendingDeletions.filter((d) => d.remainingMs <= 0)
+          .length,
+      });
+    } catch (error) {
+      this.logger.error("Failed to initialize SessionNotificationService", {
+        error,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Handle a session event from the log parser
    */
   async handleSessionEvent(
@@ -115,20 +218,23 @@ export class SessionNotificationService {
     );
 
     if (existingNotification?.discordMessageId) {
-      // Cancel any pending deletion timeout
+      // Cancel any pending deletion timeout in memory
       const timeoutKey = `${username}-${existingNotification.discordMessageId}`;
       const existingTimeout = this.deletionTimeouts.get(timeoutKey);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
         this.deletionTimeouts.delete(timeoutKey);
         this.logger.debug(
-          "Cancelled pending deletion for existing notification",
+          "Cancelled pending deletion timeout for existing notification",
           {
             username,
             messageId: existingNotification.discordMessageId,
           }
         );
       }
+
+      // Cancel scheduled deletion in database
+      await this.database.cancelScheduledDeletion(username);
 
       // Update existing notification expiration time to extend its lifecycle
       await this.database.recordSessionNotification({
@@ -231,8 +337,14 @@ export class SessionNotificationService {
       return;
     }
 
-    // Schedule deletion after configured delay
-    const deletionDelay = this.config.deletionDelayMs; // Configurable deletion delay
+    // Calculate deletion time
+    const deletionTime = new Date(Date.now() + this.config.deletionDelayMs);
+
+    // Store deletion schedule in database for persistence across restarts
+    await this.database.scheduleNotificationDeletion(username, deletionTime);
+
+    // Schedule deletion timeout in memory
+    const deletionDelay = this.config.deletionDelayMs;
     const timeoutId = setTimeout(async () => {
       await this.deleteNotificationMessage(activeNotification);
       this.deletionTimeouts.delete(
@@ -252,6 +364,7 @@ export class SessionNotificationService {
         username,
         messageId: activeNotification.discordMessageId,
         deletionDelayMs: deletionDelay,
+        deleteAt: deletionTime.toISOString(),
       }
     );
   }

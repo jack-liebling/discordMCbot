@@ -169,6 +169,9 @@ export class DiscordBot {
           sessionConfig
         );
 
+        // Initialize the service (restore timeouts, clean up orphaned messages)
+        await this.sessionNotificationService.initialize();
+
         // Register session event callback with log parser
         this.logParserService.addSessionEventCallback(async (sessionEvent) => {
           if (this.sessionNotificationService) {

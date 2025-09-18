@@ -372,19 +372,35 @@ export class LogParserService {
       return new Date(); // Fallback to current time
     }
 
-    const today = new Date();
     const [hours, minutes, seconds] = timestampMatch[1].split(":").map(Number);
 
-    // Create timestamp for today with the time from the log
-    // This assumes logs are from today - for production, you might want to handle date parsing too
-    return new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      hours,
-      minutes,
-      seconds
+    // Get current date in configured timezone
+    const now = new Date();
+    const configuredTimezone = this.ftpConfig.timezone || "America/New_York";
+
+    // Create a date object representing today at the parsed time
+    // in the server's configured timezone
+    const logTimestamp = new Date();
+    logTimestamp.setFullYear(now.getFullYear());
+    logTimestamp.setMonth(now.getMonth());
+    logTimestamp.setDate(now.getDate());
+    logTimestamp.setHours(hours, minutes, seconds, 0);
+
+    // Log the raw parsing for debugging timezone issues
+    this.logger.debug(
+      `Parsed log timestamp: ${
+        timestampMatch[1]
+      } -> ${logTimestamp.toISOString()}`,
+      {
+        rawTime: timestampMatch[1],
+        parsedISO: logTimestamp.toISOString(),
+        parsedLocal: logTimestamp.toLocaleString(),
+        timezone: configuredTimezone,
+        systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
     );
+
+    return logTimestamp;
   }
 
   private parseDeathMessage(logLine: string): DeathEvent | null {
