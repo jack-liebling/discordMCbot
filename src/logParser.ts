@@ -391,7 +391,7 @@ export class LogParserService {
     ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
     // Parse the time as if it's in UTC, then adjust for timezone
-    const tempDate = new Date(`${todayInServerTz}T${timeStr}:00Z`);
+    const tempDate = new Date(`${todayInServerTz}T${timeStr}.000Z`);
 
     // Calculate timezone offset for the configured timezone
     const jan = new Date(tempDate.getFullYear(), 0, 1);
