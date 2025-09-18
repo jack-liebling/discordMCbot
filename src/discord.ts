@@ -140,7 +140,7 @@ export class DiscordFormatter {
       hour12: true,
     };
 
-    return timestamp.toLocaleDateString("en-US", options);
+    return timestamp.toLocaleString("en-US", options);
   }
 
   private formatTimeSinceLastDeath(
