@@ -177,13 +177,30 @@ export class SessionNotificationService {
       return;
     }
 
+    // Add debug logging for all session events
+    this.logger.info(
+      `Processing session event: ${sessionEvent.type} for ${sessionEvent.username}`,
+      {
+        username: sessionEvent.username,
+        type: sessionEvent.type,
+        timestamp: sessionEvent.timestamp,
+      }
+    );
+
     try {
       switch (sessionEvent.type) {
         case "JOIN":
           await this.handleJoinEvent(sessionEvent, discordChannel);
           break;
         case "LEAVE":
+          this.logger.info("About to handle LEAVE event", {
+            username: sessionEvent.username,
+            timestamp: sessionEvent.timestamp,
+          });
           await this.handleLeaveEvent(sessionEvent);
+          this.logger.info("LEAVE event handled successfully", {
+            username: sessionEvent.username,
+          });
           break;
         default:
           this.logger.warn("Unknown session event type", {
@@ -322,12 +339,22 @@ export class SessionNotificationService {
   private async handleLeaveEvent(sessionEvent: SessionEvent): Promise<void> {
     const { username } = sessionEvent;
 
-    // Find active JOIN notification for this user BEFORE updating session state
-    // (since findActiveJoinNotification requires is_online = true)
+    this.logger.info("Starting LEAVE event processing", {
+      username,
+      timestamp: sessionEvent.timestamp,
+    });
+
+    // Find active JOIN notification for this user
     const activeNotification = await this.database.findActiveJoinNotification(
       username,
       this.config.whoIsOnChannelId
     );
+
+    this.logger.info("Active notification lookup result", {
+      username,
+      found: !!activeNotification,
+      messageId: activeNotification?.discordMessageId,
+    });
 
     // Update the player's online status after finding the notification
     await this.database.updatePlayerSessionState(
@@ -335,6 +362,10 @@ export class SessionNotificationService {
       false,
       sessionEvent.timestamp
     );
+
+    this.logger.info("Player session state updated to offline", {
+      username,
+    });
 
     if (!activeNotification) {
       this.logger.debug("No active JOIN notification found for LEAVE event", {
