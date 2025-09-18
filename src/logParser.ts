@@ -372,19 +372,127 @@ export class LogParserService {
       return new Date(); // Fallback to current time
     }
 
-    const today = new Date();
     const [hours, minutes, seconds] = timestampMatch[1].split(":").map(Number);
+    const configuredTimezone = this.ftpConfig.timezone || "America/New_York";
 
-    // Create timestamp for today with the time from the log
-    // This assumes logs are from today - for production, you might want to handle date parsing too
-    return new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      hours,
-      minutes,
-      seconds
+    // Get current date in the server's timezone to determine what "today" is
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: configuredTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const todayInServerTz = formatter.format(now); // Returns YYYY-MM-DD format
+
+    // Create timestamp string for today at the parsed time
+    const timeStr = `${String(hours).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+    // Parse the time as if it's in UTC, then adjust for timezone
+    const tempDate = new Date(`${todayInServerTz}T${timeStr}:00Z`);
+
+    // Calculate timezone offset for the configured timezone
+    const jan = new Date(tempDate.getFullYear(), 0, 1);
+    const janOffset = this.getTimezoneOffsetForDate(jan, configuredTimezone);
+
+    // Use the current offset (accounting for DST)
+    const currentOffset = this.getTimezoneOffsetForDate(
+      tempDate,
+      configuredTimezone
     );
+
+    // Adjust the timestamp by subtracting the timezone offset
+    const logTimestamp = new Date(
+      tempDate.getTime() - currentOffset * 60 * 1000
+    );
+
+    // Log the raw parsing for debugging timezone issues, but only if specifically enabled
+    if (process.env.LOG_TIMESTAMP_DEBUG === "1") {
+      this.logger.debug(
+        `Parsed log timestamp: ${
+          timestampMatch[1]
+        } -> ${logTimestamp.toISOString()}`,
+        {
+          rawTime: timestampMatch[1],
+          serverDate: todayInServerTz,
+          timeString: timeStr,
+          tempUTC: tempDate.toISOString(),
+          finalISO: logTimestamp.toISOString(),
+          finalLocal: logTimestamp.toLocaleString(),
+          timezone: configuredTimezone,
+          systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          offsetMinutes: currentOffset,
+          isDST: currentOffset !== janOffset, // DST active when offset differs from January (standard time)
+        }
+      );
+    }
+
+    return logTimestamp;
+  }
+
+  /**
+   * Get timezone offset in minutes for a specific date and timezone
+   */
+  private getTimezoneOffsetForDate(date: Date, timezone: string): number {
+    // Get the time parts in UTC
+    const utcParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(date);
+
+    // Get the time parts in the target timezone
+    const tzParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(date);
+
+    // Helper to extract values from formatToParts
+    function getParts(parts: Intl.DateTimeFormatPart[]) {
+      const get = (type: string) => parts.find((p) => p.type === type)?.value;
+      return {
+        year: Number(get("year")),
+        month: Number(get("month")),
+        day: Number(get("day")),
+        hour: Number(get("hour")),
+        minute: Number(get("minute")),
+        second: Number(get("second")),
+      };
+    }
+
+    const utc = getParts(utcParts);
+    const tz = getParts(tzParts);
+
+    // Create Date objects from the extracted parts
+    const utcDate = new Date(
+      Date.UTC(
+        utc.year,
+        utc.month - 1,
+        utc.day,
+        utc.hour,
+        utc.minute,
+        utc.second
+      )
+    );
+    const tzDate = new Date(
+      Date.UTC(tz.year, tz.month - 1, tz.day, tz.hour, tz.minute, tz.second)
+    );
+
+    // The offset is the difference in minutes between the target timezone and UTC
+    return (tzDate.getTime() - utcDate.getTime()) / (1000 * 60);
   }
 
   private parseDeathMessage(logLine: string): DeathEvent | null {

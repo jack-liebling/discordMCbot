@@ -912,6 +912,109 @@ export class DatabaseService {
   }
 
   /**
+   * Get notifications that are scheduled for deletion (for restoring timeouts on startup)
+   */
+  public async getPendingDeletions(): Promise<
+    Array<{
+      username: string;
+      discordMessageId: string;
+      deleteScheduledAt: Date;
+      remainingMs: number;
+    }>
+  > {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT username, notification_message_id, delete_scheduled_at
+        FROM player_session_notifications 
+        WHERE delete_scheduled_at IS NOT NULL 
+        AND delete_scheduled_at > NOW()
+        AND status = 'active'
+        ORDER BY delete_scheduled_at ASC
+        `
+      );
+
+      const now = new Date();
+      return result.rows.map((row) => {
+        const deleteScheduledAt = new Date(row.delete_scheduled_at);
+        return {
+          username: row.username,
+          discordMessageId: row.notification_message_id,
+          deleteScheduledAt,
+          remainingMs: Math.max(0, deleteScheduledAt.getTime() - now.getTime()),
+        };
+      });
+    } catch (error) {
+      this.logger.error("Failed to get pending deletions", { error });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Schedule a notification for deletion at a specific time
+   */
+  public async scheduleNotificationDeletion(
+    username: string,
+    deleteAt: Date
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(
+        `
+        UPDATE player_session_notifications 
+        SET delete_scheduled_at = $2, updated_at = NOW()
+        WHERE username = $1 AND status = 'active'
+        `,
+        [username, deleteAt]
+      );
+
+      this.logger.debug("Scheduled notification deletion", {
+        username,
+        deleteAt: deleteAt.toISOString(),
+      });
+    } catch (error) {
+      this.logger.error("Failed to schedule notification deletion", {
+        error,
+        username,
+        deleteAt,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Cancel scheduled deletion for a notification
+   */
+  public async cancelScheduledDeletion(username: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(
+        `
+        UPDATE player_session_notifications 
+        SET delete_scheduled_at = NULL, updated_at = NOW()
+        WHERE username = $1 AND status = 'active'
+        `,
+        [username]
+      );
+
+      this.logger.debug("Cancelled scheduled deletion", { username });
+    } catch (error) {
+      this.logger.error("Failed to cancel scheduled deletion", {
+        error,
+        username,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Check if player is in cooldown period
    */
   public async checkSessionCooldown(
