@@ -761,27 +761,32 @@ export class DatabaseService {
     try {
       const expiresAt =
         data.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours default
+      const eventTimestamp = data.timestamp || new Date(); // Use provided timestamp or current time
 
       const result = await client.query(
         `
         INSERT INTO player_session_notifications 
-        (username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        (username, is_online, last_join_timestamp, notification_message_id, delete_scheduled_at, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         ON CONFLICT (username) 
         DO UPDATE SET 
           is_online = $2,
-          notification_message_id = $3,
-          delete_scheduled_at = $4,
-          status = $5,
+          last_join_timestamp = CASE WHEN $2 = true THEN $3 ELSE player_session_notifications.last_join_timestamp END,
+          last_leave_timestamp = CASE WHEN $2 = false THEN $7 ELSE player_session_notifications.last_leave_timestamp END,
+          notification_message_id = $4,
+          delete_scheduled_at = $5,
+          status = $6,
           updated_at = NOW()
         RETURNING username, is_online, notification_message_id, delete_scheduled_at, status, created_at, updated_at
         `,
         [
-          data.username,
-          data.type === "JOIN",
-          data.discordMessageId,
-          data.type === "JOIN" ? null : expiresAt,
-          "active",
+          data.username, // $1
+          data.type === "JOIN", // $2 - is_online boolean
+          data.type === "JOIN" ? eventTimestamp : null, // $3 - join timestamp
+          data.discordMessageId, // $4
+          data.type === "JOIN" ? null : expiresAt, // $5 - delete_scheduled_at
+          "active", // $6 - status
+          data.type === "LEAVE" ? eventTimestamp : null, // $7 - leave timestamp
         ]
       );
 
@@ -855,54 +860,25 @@ export class DatabaseService {
   /**
    * Mark notification as deleted (set discord_message_id to null)
    */
-  public async markNotificationDeleted(username: string): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `
-        UPDATE player_session_notifications 
-        SET notification_message_id = NULL, status = 'deleted', updated_at = NOW()
-        WHERE username = $1
-        `,
-        [username]
-      );
-
-      return (result.rowCount || 0) > 0;
-    } catch (error) {
-      this.logger.error("Failed to mark notification deleted", {
-        error,
-        username,
-      });
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Schedule notification for deletion
-   */
-  public async scheduleNotificationDeletion(
-    username: string,
-    deleteAt: Date
+  public async markNotificationDeleted(
+    discordMessageId: string
   ): Promise<boolean> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
         `
         UPDATE player_session_notifications 
-        SET delete_scheduled_at = $2, status = 'scheduled_for_deletion', is_online = false, updated_at = NOW()
-        WHERE username = $1
+        SET notification_message_id = NULL, status = 'deleted', is_online = false, updated_at = NOW()
+        WHERE notification_message_id = $1
         `,
-        [username, deleteAt]
+        [discordMessageId]
       );
 
       return (result.rowCount || 0) > 0;
     } catch (error) {
-      this.logger.error("Failed to schedule notification deletion", {
+      this.logger.error("Failed to mark notification deleted", {
         error,
-        username,
-        deleteAt,
+        discordMessageId,
       });
       throw error;
     } finally {
@@ -1067,6 +1043,118 @@ export class DatabaseService {
         error,
         channelId,
       });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update player session state (for tracking online/offline status)
+   */
+  public async updatePlayerSessionState(
+    username: string,
+    isOnline: boolean,
+    sessionTimestamp?: Date
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      const eventTime = sessionTimestamp || new Date();
+
+      await client.query(
+        `
+        INSERT INTO player_session_notifications 
+        (username, is_online, last_join_timestamp, last_leave_timestamp, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, 'active', NOW(), NOW())
+        ON CONFLICT (username) 
+        DO UPDATE SET 
+          is_online = $2,
+          last_join_timestamp = CASE WHEN $2 = true THEN $3 ELSE player_session_notifications.last_join_timestamp END,
+          last_leave_timestamp = CASE WHEN $2 = false THEN $4 ELSE player_session_notifications.last_leave_timestamp END,
+          updated_at = NOW()
+        `,
+        [
+          username,
+          isOnline,
+          isOnline ? eventTime : null, // Only update join timestamp for JOIN events
+          !isOnline ? eventTime : null, // Only update leave timestamp for LEAVE events
+        ]
+      );
+
+      this.logger.debug(
+        `Updated session state for ${username}: ${
+          isOnline ? "online" : "offline"
+        } at ${eventTime.toISOString()}`
+      );
+    } catch (error) {
+      this.logger.error("Failed to update player session state", {
+        error,
+        username,
+        isOnline,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get all currently online players
+   */
+  public async getCurrentlyOnlinePlayers(): Promise<string[]> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT username 
+        FROM player_session_notifications
+        WHERE is_online = true AND status = 'active'
+        ORDER BY last_join_timestamp DESC
+        `
+      );
+
+      return result.rows.map((row) => row.username);
+    } catch (error) {
+      this.logger.error("Failed to get currently online players", { error });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get detailed session information for all players
+   */
+  public async getAllPlayerSessions(): Promise<
+    Array<{
+      username: string;
+      isOnline: boolean;
+      lastJoinTimestamp: Date | null;
+      lastLeaveTimestamp: Date | null;
+      hasActiveNotification: boolean;
+    }>
+  > {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT username, is_online, last_join_timestamp, last_leave_timestamp, 
+               notification_message_id, status
+        FROM player_session_notifications
+        ORDER BY last_join_timestamp DESC NULLS LAST
+        `
+      );
+
+      return result.rows.map((row) => ({
+        username: row.username,
+        isOnline: row.is_online,
+        lastJoinTimestamp: row.last_join_timestamp,
+        lastLeaveTimestamp: row.last_leave_timestamp,
+        hasActiveNotification:
+          row.notification_message_id !== null && row.status === "active",
+      }));
+    } catch (error) {
+      this.logger.error("Failed to get all player sessions", { error });
       throw error;
     } finally {
       client.release();

@@ -101,6 +101,13 @@ export class SessionNotificationService {
   ): Promise<void> {
     const { username } = sessionEvent;
 
+    // Always update the player's online status first
+    await this.database.updatePlayerSessionState(
+      username,
+      true,
+      sessionEvent.timestamp
+    );
+
     // First, check if there's an existing notification with pending deletion
     const existingNotification = await this.database.findActiveJoinNotification(
       username,
@@ -131,6 +138,7 @@ export class SessionNotificationService {
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
         expiresAt: new Date(Date.now() + this.config.deletionDelayMs),
+        timestamp: sessionEvent.timestamp, // Use actual event timestamp
       });
 
       this.logger.info("User rejoined - existing notification preserved", {
@@ -175,6 +183,7 @@ export class SessionNotificationService {
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
         expiresAt: new Date(Date.now() + this.config.deletionDelayMs), // Configurable deletion delay
+        timestamp: sessionEvent.timestamp, // Use actual event timestamp from logs
       };
 
       await this.database.recordSessionNotification(notificationData);
@@ -201,6 +210,13 @@ export class SessionNotificationService {
    */
   private async handleLeaveEvent(sessionEvent: SessionEvent): Promise<void> {
     const { username } = sessionEvent;
+
+    // Always update the player's online status first
+    await this.database.updatePlayerSessionState(
+      username,
+      false,
+      sessionEvent.timestamp
+    );
 
     // Find active JOIN notification for this user
     const activeNotification = await this.database.findActiveJoinNotification(
@@ -230,11 +246,14 @@ export class SessionNotificationService {
       timeoutId
     );
 
-    this.logger.debug("Scheduled JOIN notification deletion", {
-      username,
-      messageId: activeNotification.discordMessageId,
-      deletionDelayMs: deletionDelay,
-    });
+    this.logger.info(
+      "Player marked as offline and scheduled JOIN notification deletion",
+      {
+        username,
+        messageId: activeNotification.discordMessageId,
+        deletionDelayMs: deletionDelay,
+      }
+    );
   }
 
   /**

@@ -322,6 +322,7 @@ export interface SessionNotificationData {
   discordChannelId: string;
   discordGuildId: string;
   expiresAt?: Date;
+  timestamp?: Date; // Actual timestamp of the session event from logs
 }
 
 export interface SessionHistoryRecord {
