@@ -4,14 +4,14 @@ import { ConfigLoader } from "./src/config";
 
 async function cleanupStaleNotifications() {
   const config = ConfigLoader.getInstance().getConfig();
-  
+
   if (!config.DATABASE_URL) {
     console.error("❌ No DATABASE_URL found in environment");
     process.exit(1);
   }
 
   const database = DatabaseService.getInstance(config.DATABASE_URL);
-  
+
   try {
     await database.initialize();
     console.log("🔗 Connected to database");
@@ -19,7 +19,7 @@ async function cleanupStaleNotifications() {
     // Get current stale notifications
     const pool = (database as any).pool;
     const client = await pool.connect();
-    
+
     try {
       // Find all active notifications with message IDs
       const activeResult = await client.query(`
@@ -27,10 +27,12 @@ async function cleanupStaleNotifications() {
         FROM player_session_notifications 
         WHERE status = 'active' AND notification_message_id IS NOT NULL
       `);
-      
+
       console.log(`📊 Found ${activeResult.rows.length} active notifications:`);
       activeResult.rows.forEach((row: any) => {
-        console.log(`  - ${row.username}: ${row.notification_message_id} (online: ${row.is_online})`);
+        console.log(
+          `  - ${row.username}: ${row.notification_message_id} (online: ${row.is_online})`
+        );
       });
 
       // Mark all existing notifications as deleted to clean up stale state
@@ -42,8 +44,10 @@ async function cleanupStaleNotifications() {
             updated_at = NOW()
         WHERE status = 'active' AND notification_message_id IS NOT NULL
       `);
-      
-      console.log(`✅ Marked ${deleteResult.rowCount} notifications as deleted`);
+
+      console.log(
+        `✅ Marked ${deleteResult.rowCount} notifications as deleted`
+      );
 
       // Reset all players to offline state
       const offlineResult = await client.query(`
@@ -52,7 +56,7 @@ async function cleanupStaleNotifications() {
             updated_at = NOW()
         WHERE is_online = true
       `);
-      
+
       console.log(`✅ Marked ${offlineResult.rowCount} players as offline`);
 
       // Clean up any scheduled deletions
@@ -62,15 +66,13 @@ async function cleanupStaleNotifications() {
             updated_at = NOW()
         WHERE delete_scheduled_at IS NOT NULL
       `);
-      
-      console.log(`✅ Cleared ${scheduledResult.rowCount} scheduled deletions`);
 
+      console.log(`✅ Cleared ${scheduledResult.rowCount} scheduled deletions`);
     } finally {
       client.release();
     }
 
     console.log("🎉 Cleanup completed successfully!");
-
   } catch (error) {
     console.error("❌ Error during cleanup:", error);
   } finally {
