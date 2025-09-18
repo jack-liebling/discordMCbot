@@ -5,9 +5,23 @@ import { EnvironmentConfig } from "./types";
 // Load environment variables from .env file
 dotenv.config();
 
+/**
+ * Session notification timing constants
+ */
+export const SESSION_NOTIFICATION_CONSTANTS = {
+  // Default deletion delay in milliseconds (2 minutes)
+  DELETION_DELAY_MS: 2 * 60 * 1000,
+
+  // Default cooldown in seconds (2 minutes)
+  DEFAULT_COOLDOWN_SECONDS: 120,
+
+  // Convert seconds to milliseconds for timeout operations
+  secondsToMs: (seconds: number): number => seconds * 1000,
+} as const;
+
 export class ConfigLoader {
   private static instance: ConfigLoader;
-  private config: EnvironmentConfig;
+  private readonly config: EnvironmentConfig;
 
   private constructor() {
     this.config = this.loadEnvironmentConfig();
@@ -106,6 +120,7 @@ export class ConfigLoader {
       craftersRoleId: this.config.CRAFTERS_ROLE_ID,
       whoIsOnChannelId: this.config.WHO_IS_ON_CHANNEL_ID,
       cooldownSeconds: parseInt(this.config.SESSION_COOLDOWN_SECONDS || "120"),
+      deletionDelayMs: SESSION_NOTIFICATION_CONSTANTS.DELETION_DELAY_MS,
     };
   }
 

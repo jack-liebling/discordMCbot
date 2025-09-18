@@ -165,6 +165,7 @@ export class DiscordBot {
         this.sessionNotificationService = new SessionNotificationService(
           this.storageService.getDatabaseService(),
           this.formatter,
+          this.client,
           sessionConfig
         );
 

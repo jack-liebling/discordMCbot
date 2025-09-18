@@ -7,32 +7,37 @@ import {
 import { DatabaseService } from "./database";
 import { DiscordFormatter } from "./discord";
 import { Logger } from "./logger";
-import { TextChannel } from "discord.js";
+import { TextChannel, Client } from "discord.js";
 
 export class SessionNotificationService {
   private readonly logger = Logger.getInstance();
   private readonly database: DatabaseService;
   private readonly discordFormatter: DiscordFormatter;
+  private readonly discordClient: Client;
   private readonly config: {
     enabled: boolean;
     craftersRoleId: string;
     whoIsOnChannelId: string;
     cooldownSeconds: number;
+    deletionDelayMs: number;
   };
   private readonly deletionTimeouts = new Map<string, NodeJS.Timeout>();
 
   constructor(
     database: DatabaseService,
     discordFormatter: DiscordFormatter,
+    discordClient: Client,
     config: {
       enabled: boolean;
       craftersRoleId: string;
       whoIsOnChannelId: string;
       cooldownSeconds: number;
+      deletionDelayMs: number;
     }
   ) {
     this.database = database;
     this.discordFormatter = discordFormatter;
+    this.discordClient = discordClient;
     this.config = config;
 
     this.logger.debug("SessionNotificationService initialized", {
@@ -40,6 +45,13 @@ export class SessionNotificationService {
       craftersRoleId: config.craftersRoleId,
       whoIsOnChannelId: config.whoIsOnChannelId,
     });
+
+    // Note: Discord bot requires the following permissions in the target channel:
+    // - Send Messages
+    // - Manage Messages (for deleting own messages)
+    // - Use External Emojis
+    // - Embed Links
+    // - Mention Everyone (for @role mentions)
   }
 
   /**
@@ -123,7 +135,7 @@ export class SessionNotificationService {
         discordMessageId: message.id,
         discordChannelId: discordChannel.id,
         discordGuildId: discordChannel.guild.id,
-        expiresAt: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes from now
+        expiresAt: new Date(Date.now() + this.config.deletionDelayMs), // Configurable deletion delay
       };
 
       await this.database.recordSessionNotification(notificationData);
@@ -164,8 +176,8 @@ export class SessionNotificationService {
       return;
     }
 
-    // Schedule deletion after 2 minutes
-    const deletionDelay = 2 * 60 * 1000; // 2 minutes in milliseconds
+    // Schedule deletion after configured delay
+    const deletionDelay = this.config.deletionDelayMs; // Configurable deletion delay
     const timeoutId = setTimeout(async () => {
       await this.deleteNotificationMessage(activeNotification);
       this.deletionTimeouts.delete(
@@ -192,32 +204,85 @@ export class SessionNotificationService {
   private async deleteNotificationMessage(
     notification: NotificationRecord
   ): Promise<void> {
-    try {
-      // Note: We'll need to pass the Discord client to delete messages
-      // For now, we'll just mark as deleted in database
-      if (notification.discordMessageId) {
-        await this.database.markNotificationDeleted(
-          notification.discordMessageId
-        );
-
-        this.logger.info("Notification marked for deletion", {
+    if (!notification.discordMessageId) {
+      this.logger.warn(
+        "No discordMessageId found for notification, skipping deletion",
+        {
           username: notification.username,
+        }
+      );
+      return;
+    }
+
+    try {
+      // Fetch the Discord channel
+      const channel = await this.discordClient.channels.fetch(
+        notification.discordChannelId || this.config.whoIsOnChannelId
+      );
+
+      if (!channel?.isTextBased()) {
+        this.logger.error("Channel not found or not text-based", {
+          channelId:
+            notification.discordChannelId || this.config.whoIsOnChannelId,
           messageId: notification.discordMessageId,
         });
-      } else {
+        return;
+      }
+
+      // Delete the message from Discord
+      try {
+        const message = await channel.messages.fetch(
+          notification.discordMessageId
+        );
+        await message.delete();
+
+        this.logger.info("Discord message deleted successfully", {
+          username: notification.username,
+          messageId: notification.discordMessageId,
+          channelId: channel.id,
+        });
+      } catch (messageError) {
+        // Message might already be deleted or not found
         this.logger.warn(
-          "No discordMessageId found for notification, skipping deletion",
+          "Could not delete Discord message (may already be deleted)",
           {
+            error: messageError,
+            messageId: notification.discordMessageId,
             username: notification.username,
           }
         );
       }
+
+      // Mark as deleted in database regardless of Discord deletion success
+      await this.database.markNotificationDeleted(
+        notification.discordMessageId
+      );
+
+      this.logger.info("Notification marked as deleted in database", {
+        username: notification.username,
+        messageId: notification.discordMessageId,
+      });
     } catch (error) {
       this.logger.error("Failed to delete notification message", {
         error,
         messageId: notification.discordMessageId,
         username: notification.username,
       });
+
+      // Still mark as deleted in database to prevent retries
+      try {
+        await this.database.markNotificationDeleted(
+          notification.discordMessageId
+        );
+      } catch (dbError) {
+        this.logger.error(
+          "Failed to mark notification as deleted in database",
+          {
+            error: dbError,
+            messageId: notification.discordMessageId,
+          }
+        );
+      }
     }
   }
 
@@ -244,6 +309,7 @@ export class SessionNotificationService {
       craftersRoleId: string;
       whoIsOnChannelId: string;
       cooldownSeconds: number;
+      deletionDelayMs: number;
     };
   } {
     return {

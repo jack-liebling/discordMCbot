@@ -83,9 +83,14 @@ async function validateSessionNotifications() {
 
     // 4. Test Session Notification Service
     console.log("4. Testing Session Notification Service...");
+    // Note: For validation, we'll create a mock client since we don't need real Discord operations
+    const mockClient = {
+      channels: { fetch: () => Promise.resolve(null) },
+    } as any;
     const sessionService = new SessionNotificationService(
       database,
       formatter,
+      mockClient,
       sessionConfig
     );
 

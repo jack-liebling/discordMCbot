@@ -15,10 +15,11 @@ import {
   CooldownStatus,
 } from "./types";
 import { Logger } from "./logger";
+import { SESSION_NOTIFICATION_CONSTANTS } from "./config";
 
 export class DatabaseService {
-  private pool: Pool;
-  private logger = Logger.getInstance();
+  private readonly pool: Pool;
+  private readonly logger = Logger.getInstance();
   private static instance: DatabaseService;
   private static readonly CURRENT_SCHEMA_VERSION = 3; // Version 3 includes session notifications
 
@@ -1002,7 +1003,10 @@ export class DatabaseService {
     const client = await this.pool.connect();
     try {
       if (eventType === "JOIN") {
-        const cooldownExpires = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+        const cooldownExpires = new Date(
+          Date.now() +
+            SESSION_NOTIFICATION_CONSTANTS.DEFAULT_COOLDOWN_SECONDS * 1000
+        ); // Configurable cooldown duration
 
         await client.query(
           `

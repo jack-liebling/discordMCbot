@@ -290,7 +290,7 @@ export class LogParserService {
               ({
                 type: activity.type,
                 username: activity.match[2],
-                timestamp: new Date(),
+                timestamp: this.parseTimestampFromLogLine(activity.logLine),
                 rawLogLine: activity.logLine,
               } as SessionEvent)
           );
@@ -312,7 +312,7 @@ export class LogParserService {
     logLine: string
   ): NewPlayerActivity | null {
     try {
-      const timestamp = new Date();
+      const timestamp = this.parseTimestampFromLogLine(logLine);
       const username = match[2];
 
       switch (type) {
@@ -360,6 +360,33 @@ export class LogParserService {
     }
   }
 
+  /**
+   * Parse timestamp from Minecraft log line
+   * Log format: [HH:MM:SS] [thread/level]: message
+   */
+  private parseTimestampFromLogLine(logLine: string): Date {
+    const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
+    const timestampMatch = timestampPattern.exec(logLine);
+    if (!timestampMatch) {
+      this.logger.warn(`Could not parse timestamp from log line: ${logLine}`);
+      return new Date(); // Fallback to current time
+    }
+
+    const today = new Date();
+    const [hours, minutes, seconds] = timestampMatch[1].split(":").map(Number);
+
+    // Create timestamp for today with the time from the log
+    // This assumes logs are from today - for production, you might want to handle date parsing too
+    return new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      hours,
+      minutes,
+      seconds
+    );
+  }
+
   private parseDeathMessage(logLine: string): DeathEvent | null {
     // Minecraft death messages in logs look like:
     // [19:45:30] [Server thread/INFO]: Player fell from a high place
@@ -367,7 +394,8 @@ export class LogParserService {
     // [19:45:30] [Server thread/INFO]: Player drowned
 
     // Extract timestamp and message
-    const timestampMatch = logLine.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+    const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
+    const timestampMatch = timestampPattern.exec(logLine);
     if (!timestampMatch) {
       return null;
     }
