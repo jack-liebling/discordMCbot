@@ -123,7 +123,7 @@ export class SessionNotificationService {
         );
       }
 
-      // Update database to mark user as online (cancel scheduled deletion)
+      // Update existing notification expiration time to extend its lifecycle
       await this.database.recordSessionNotification({
         username,
         type: "JOIN",
