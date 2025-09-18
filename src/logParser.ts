@@ -373,18 +373,42 @@ export class LogParserService {
     }
 
     const [hours, minutes, seconds] = timestampMatch[1].split(":").map(Number);
-
-    // Get current date in configured timezone
-    const now = new Date();
     const configuredTimezone = this.ftpConfig.timezone || "America/New_York";
 
-    // Create a date object representing today at the parsed time
-    // in the server's configured timezone
-    const logTimestamp = new Date();
-    logTimestamp.setFullYear(now.getFullYear());
-    logTimestamp.setMonth(now.getMonth());
-    logTimestamp.setDate(now.getDate());
-    logTimestamp.setHours(hours, minutes, seconds, 0);
+    // Get current date in the server's timezone to determine what "today" is
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: configuredTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const todayInServerTz = formatter.format(now); // Returns YYYY-MM-DD format
+
+    // Create timestamp string for today at the parsed time
+    const timeStr = `${String(hours).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+    // Parse the time as if it's in UTC, then adjust for timezone
+    const tempDate = new Date(`${todayInServerTz}T${timeStr}:00Z`);
+
+    // Calculate timezone offset for the configured timezone
+    const jan = new Date(tempDate.getFullYear(), 0, 1);
+    const jul = new Date(tempDate.getFullYear(), 6, 1);
+    const janOffset = this.getTimezoneOffsetForDate(jan, configuredTimezone);
+    const julOffset = this.getTimezoneOffsetForDate(jul, configuredTimezone);
+
+    // Use the current offset (accounting for DST)
+    const currentOffset = this.getTimezoneOffsetForDate(
+      tempDate,
+      configuredTimezone
+    );
+
+    // Adjust the timestamp by subtracting the timezone offset
+    const logTimestamp = new Date(
+      tempDate.getTime() - currentOffset * 60 * 1000
+    );
 
     // Log the raw parsing for debugging timezone issues
     this.logger.debug(
@@ -393,14 +417,33 @@ export class LogParserService {
       } -> ${logTimestamp.toISOString()}`,
       {
         rawTime: timestampMatch[1],
-        parsedISO: logTimestamp.toISOString(),
-        parsedLocal: logTimestamp.toLocaleString(),
+        serverDate: todayInServerTz,
+        timeString: timeStr,
+        tempUTC: tempDate.toISOString(),
+        finalISO: logTimestamp.toISOString(),
+        finalLocal: logTimestamp.toLocaleString(),
         timezone: configuredTimezone,
         systemTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        offsetMinutes: currentOffset,
+        isDST: currentOffset !== janOffset || currentOffset !== julOffset,
       }
     );
 
     return logTimestamp;
+  }
+
+  /**
+   * Get timezone offset in minutes for a specific date and timezone
+   */
+  private getTimezoneOffsetForDate(date: Date, timezone: string): number {
+    // Create two Date objects - one in UTC and one in the target timezone
+    const utcTime = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+    const tzTime = new Date(
+      date.toLocaleString("en-US", { timeZone: timezone })
+    );
+
+    // Calculate the difference in minutes
+    return (tzTime.getTime() - utcTime.getTime()) / (1000 * 60);
   }
 
   private parseDeathMessage(logLine: string): DeathEvent | null {

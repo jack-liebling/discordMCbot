@@ -918,7 +918,6 @@ export class DatabaseService {
     Array<{
       username: string;
       discordMessageId: string;
-      discordChannelId: string;
       deleteScheduledAt: Date;
       remainingMs: number;
     }>
@@ -940,7 +939,6 @@ export class DatabaseService {
       return result.rows.map((row) => ({
         username: row.username,
         discordMessageId: row.notification_message_id,
-        discordChannelId: "", // We'll need to get this from the config
         deleteScheduledAt: new Date(row.delete_scheduled_at),
         remainingMs: Math.max(
           0,
