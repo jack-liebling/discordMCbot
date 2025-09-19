@@ -75,6 +75,18 @@ src/
 - 2025-09-17: Planned daily death leaderboard feature with survival champion tracking
 - 2025-09-19: Removed JSON fallback system - now database-only storage architecture
 
+## Testing Guidelines
+
+When testing functionality with `npm start`:
+
+- Start the bot and inform the developer what action needs to be performed
+- Wait for the developer to perform the test action (e.g., player death, join/leave)
+- Do NOT use timeout commands or assume events will happen automatically
+- Let the bot run until the developer indicates the test is complete
+- Then stop the bot and analyze the logs for the expected behavior
+
+Example: "I'll start the bot now. Please have a player die in-game to test the death recording functionality. Let me know when you're ready for me to stop the bot and check the results."
+
 ## Constitutional Requirements
 
 - Keep implementation simple and focused
