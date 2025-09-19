@@ -7,6 +7,7 @@ import {
   IStorageService,
   ActivityEvent,
   ActivityEventType,
+  JoinMessage,
 } from "./types";
 import { Logger } from "./logger";
 
@@ -86,6 +87,17 @@ export class DatabaseService implements IStorageService {
         key VARCHAR(255) PRIMARY KEY,
         value JSONB NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Join messages table - tracks Discord messages for deletion when players leave
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS join_messages (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        message_id VARCHAR(255) NOT NULL,
+        channel_id VARCHAR(255) NOT NULL,
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
 
@@ -475,6 +487,86 @@ export class DatabaseService implements IStorageService {
       }
     } catch (error) {
       this.logger.error("Failed to initialize configuration:", error);
+    }
+  }
+
+  /**
+   * Save a Discord join message for later deletion
+   */
+  async saveJoinMessage(joinMessage: JoinMessage): Promise<void> {
+    try {
+      const query = `
+        INSERT INTO join_messages (username, message_id, channel_id, timestamp)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET
+          message_id = EXCLUDED.message_id,
+          channel_id = EXCLUDED.channel_id,
+          timestamp = EXCLUDED.timestamp
+      `;
+
+      await this.pool.query(query, [
+        joinMessage.username,
+        joinMessage.messageId,
+        joinMessage.channelId,
+        joinMessage.timestamp,
+      ]);
+
+      this.logger.debug(
+        `Saved join message for player ${joinMessage.username}`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to save join message for ${joinMessage.username}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get a Discord join message for deletion
+   */
+  async getJoinMessage(playerName: string): Promise<JoinMessage | null> {
+    try {
+      const query = `
+        SELECT username, message_id, channel_id, timestamp
+        FROM join_messages
+        WHERE username = $1
+      `;
+
+      const result = await this.pool.query(query, [playerName]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        username: row.username,
+        messageId: row.message_id,
+        channelId: row.channel_id,
+        timestamp: row.timestamp,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get join message for ${playerName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a Discord join message record
+   */
+  async deleteJoinMessage(playerName: string): Promise<void> {
+    try {
+      const query = `DELETE FROM join_messages WHERE username = $1`;
+      await this.pool.query(query, [playerName]);
+      this.logger.debug(`Deleted join message record for player ${playerName}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete join message for ${playerName}:`,
+        error
+      );
+      throw error;
     }
   }
 

@@ -50,6 +50,15 @@ export interface SurvivalChampion {
   formattedTimeAlive: string; // Human-readable format
 }
 
+// Join message tracking for deletion when players leave
+export interface JoinMessage {
+  id?: number;
+  username: string;
+  messageId: string;
+  channelId: string;
+  timestamp: Date;
+}
+
 // Discord configuration
 export interface DiscordChannelConfig {
   channelId: string;
@@ -82,6 +91,8 @@ export interface EnvironmentConfig {
   DISCORD_TOKEN: string;
   DISCORD_CHANNEL_ID: string;
   DISCORD_GUILD_ID: string;
+  CRAFTERS_ROLE_ID?: string;
+  WHO_IS_ON_CHANNEL_ID?: string;
   SERVER_NAME: string;
   FTP_HOST?: string;
   FTP_PORT?: string;
@@ -131,6 +142,11 @@ export interface IStorageService {
   // Log state management
   getLogState(): Promise<LogProcessingState | null>;
   saveLogState(state: LogProcessingState): Promise<void>;
+
+  // Join message tracking
+  saveJoinMessage(joinMessage: JoinMessage): Promise<void>;
+  getJoinMessage(username: string): Promise<JoinMessage | null>;
+  deleteJoinMessage(username: string): Promise<void>;
 
   // Initialize with defaults
   initializeConfig(): Promise<void>;

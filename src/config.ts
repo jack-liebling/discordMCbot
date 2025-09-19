@@ -38,6 +38,8 @@ export class ConfigLoader {
       DISCORD_TOKEN: process.env.DISCORD_TOKEN!,
       DISCORD_CHANNEL_ID: process.env.DISCORD_CHANNEL_ID!,
       DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID!,
+      CRAFTERS_ROLE_ID: process.env.CRAFTERS_ROLE_ID,
+      WHO_IS_ON_CHANNEL_ID: process.env.WHO_IS_ON_CHANNEL_ID,
       SERVER_NAME: process.env.SERVER_NAME || "Minecraft Server",
       FTP_HOST: process.env.FTP_HOST,
       FTP_PORT: process.env.FTP_PORT || "21",
@@ -80,6 +82,18 @@ export class ConfigLoader {
       logPath: this.config.FTP_LOG_PATH,
       checkInterval: parseInt(this.config.LOG_CHECK_INTERVAL || "10"),
       timezone: this.config.TIMEZONE || "America/New_York",
+    };
+  }
+
+  public getJoinLeaveConfig() {
+    if (!this.config.CRAFTERS_ROLE_ID || !this.config.WHO_IS_ON_CHANNEL_ID) {
+      return null;
+    }
+
+    return {
+      craftersRoleId: this.config.CRAFTERS_ROLE_ID,
+      whoIsOnChannelId: this.config.WHO_IS_ON_CHANNEL_ID,
+      guildId: this.config.DISCORD_GUILD_ID,
     };
   }
 

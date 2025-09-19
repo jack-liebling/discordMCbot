@@ -1,7 +1,7 @@
 // T015: Discord announcement service sending formatted messages to channels
 import { Client, TextChannel } from "discord.js";
 import { DiscordFormatter } from "./discord";
-import { DeathEvent, DailyLeaderboard } from "./types";
+import { DeathEvent, DailyLeaderboard, JoinMessage } from "./types";
 import { LeaderboardFormatter } from "./leaderboardFormatter";
 import { Logger } from "./logger";
 
@@ -319,5 +319,160 @@ export class AnnouncementService {
   // Create a leaderboard embed for manual commands
   createLeaderboardEmbed(leaderboard: DailyLeaderboard) {
     return this.leaderboardFormatter.createLeaderboardEmbed(leaderboard);
+  }
+
+  /**
+   * Announce player join in the who-is-on channel with @crafters role mention
+   */
+  async announcePlayerJoin(
+    username: string,
+    whoIsOnChannelId: string,
+    craftersRoleId: string
+  ): Promise<JoinMessage | null> {
+    if (!this.client.isReady()) {
+      this.logger.warn("Discord client not ready for join announcement");
+      return null;
+    }
+
+    try {
+      const channel = (await this.client.channels.fetch(
+        whoIsOnChannelId
+      )) as TextChannel;
+
+      if (!channel?.isTextBased()) {
+        this.logger.error(
+          `Who-is-on channel ${whoIsOnChannelId} not found or not text-based`
+        );
+        return null;
+      }
+
+      const message = await channel.send({
+        content: `🟢 ${username} joined the server! <@&${craftersRoleId}>`,
+      });
+
+      const joinMessage: JoinMessage = {
+        username: username,
+        messageId: message.id,
+        channelId: whoIsOnChannelId,
+        timestamp: new Date(),
+      };
+
+      this.logger.info(`Join announcement sent for ${username}`, {
+        channel: channel.name,
+        messageId: message.id,
+      });
+
+      return joinMessage;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send join announcement for ${username}`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Delete a player's join announcement when they leave
+   */
+  async deleteJoinAnnouncement(joinMessage: JoinMessage): Promise<boolean> {
+    if (!this.client.isReady()) {
+      this.logger.warn("Discord client not ready for message deletion");
+      return false;
+    }
+
+    try {
+      const channel = (await this.client.channels.fetch(
+        joinMessage.channelId
+      )) as TextChannel;
+
+      if (!channel?.isTextBased()) {
+        this.logger.error(
+          `Channel ${joinMessage.channelId} not found or not text-based`
+        );
+        return false;
+      }
+
+      const message = await channel.messages.fetch(joinMessage.messageId);
+      await message.delete();
+
+      this.logger.info(
+        `Deleted join announcement for ${joinMessage.username}`,
+        {
+          channel: channel.name,
+          messageId: joinMessage.messageId,
+        }
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete join announcement for ${joinMessage.username}`,
+        { messageId: joinMessage.messageId, error }
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Clean up orphaned join messages in the who-is-on channel on bot startup
+   * This handles the edge case where the bot was offline, database was cleaned,
+   * but join messages still exist in Discord
+   */
+  async cleanupOrphanedJoinMessages(whoIsOnChannelId: string): Promise<void> {
+    if (!this.client.isReady()) {
+      this.logger.warn("Discord client not ready for cleanup");
+      return;
+    }
+
+    try {
+      const channel = (await this.client.channels.fetch(
+        whoIsOnChannelId
+      )) as TextChannel;
+
+      if (!channel?.isTextBased()) {
+        this.logger.error(
+          `Who-is-on channel ${whoIsOnChannelId} not found or not text-based`
+        );
+        return;
+      }
+
+      // Fetch recent messages (last 100) to find join announcements
+      const messages = await channel.messages.fetch({ limit: 100 });
+
+      let cleanedCount = 0;
+      for (const message of messages.values()) {
+        // Check if this is a bot join message (contains "joined the server!")
+        if (
+          message.author.id === this.client.user?.id &&
+          message.content.includes("joined the server!")
+        ) {
+          try {
+            await message.delete();
+            cleanedCount++;
+            this.logger.debug(
+              `Cleaned up orphaned join message: ${message.id}`
+            );
+          } catch (deleteError) {
+            this.logger.warn(
+              `Failed to delete orphaned join message ${message.id}`,
+              deleteError
+            );
+          }
+        }
+      }
+
+      if (cleanedCount > 0) {
+        this.logger.info(
+          `Cleaned up ${cleanedCount} orphaned join messages from #${channel.name}`
+        );
+      } else {
+        this.logger.debug(
+          `No orphaned join messages found in #${channel.name}`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Failed to cleanup orphaned join messages", error);
+    }
   }
 }

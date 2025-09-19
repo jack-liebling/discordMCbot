@@ -506,4 +506,23 @@ export class LogParserService {
       return false;
     }
   }
+
+  // Set callback for death events
+  setOnDeathCallback(callback: (death: DeathEvent) => void): void {
+    this.onDeathCallback = callback;
+  }
+
+  // Set callback for join events
+  setOnJoinCallback(
+    callback: (username: string, timestamp: Date) => void
+  ): void {
+    this.onJoinCallback = callback;
+  }
+
+  // Set callback for leave events
+  setOnLeaveCallback(
+    callback: (username: string, timestamp: Date) => void
+  ): void {
+    this.onLeaveCallback = callback;
+  }
 }

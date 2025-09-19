@@ -163,11 +163,48 @@ export class DiscordBot {
         async (username, timestamp) => {
           await this.playerTracker.recordJoin(username, timestamp);
           this.logger.info(`Player joined: ${username}`);
+
+          // Handle join announcement with @crafters role mention
+          const joinLeaveConfig = this.configLoader.getJoinLeaveConfig();
+          if (joinLeaveConfig) {
+            const joinMessage =
+              await this.announcementService.announcePlayerJoin(
+                username,
+                joinLeaveConfig.whoIsOnChannelId,
+                joinLeaveConfig.craftersRoleId
+              );
+
+            if (joinMessage) {
+              await this.storageService.saveJoinMessage(joinMessage);
+              this.logger.info(`Saved join message for ${username}`);
+            }
+          }
         },
         // Leave callback
         async (username, timestamp) => {
           await this.playerTracker.recordLeave(username, timestamp);
           this.logger.info(`Player left: ${username}`);
+
+          // Handle leave announcement by deleting the join message
+          const joinMessage = await this.storageService.getJoinMessage(
+            username
+          );
+          if (joinMessage) {
+            const deleted =
+              await this.announcementService.deleteJoinAnnouncement(
+                joinMessage
+              );
+            if (deleted) {
+              await this.storageService.deleteJoinMessage(username);
+              this.logger.info(`Deleted join message for ${username}`);
+            } else {
+              this.logger.warn(`Failed to delete join message for ${username}`);
+            }
+          } else {
+            this.logger.debug(
+              `No join message found for ${username} to delete`
+            );
+          }
         }
       );
 
@@ -175,6 +212,14 @@ export class DiscordBot {
 
       // Initialize announcement service
       await this.announcementService.initialize();
+
+      // Clean up orphaned join messages from previous bot sessions
+      const joinLeaveConfig = this.configLoader.getJoinLeaveConfig();
+      if (joinLeaveConfig) {
+        await this.announcementService.cleanupOrphanedJoinMessages(
+          joinLeaveConfig.whoIsOnChannelId
+        );
+      }
 
       // Initialize leaderboard services
       this.leaderboardService = new LeaderboardService(this.storageService);
