@@ -15,7 +15,8 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 ## Architecture Principles
 
 - Single feature focus with planned leaderboard extension
-- Database-only data storage with PostgreSQL
+- Database-only data storage with PostgreSQL (store timestamps as UTC)
+- All client-facing timestamps displayed in New York time (EST/EDT)
 - Event-driven Discord bot architecture
 - Graceful error handling without crashes
 - 30-second rate limiting per player
@@ -36,6 +37,8 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 ## Key Implementation Notes
 
 - Use Discord embeds for structured death announcements
+- All Discord timestamps display in New York time (EST/EDT) using TimezoneUtils
+- Database stores all timestamps as UTC for consistency
 - FTP log parsing every 10 seconds for accurate death detection with real causes
 - Rate limit: ignore deaths <30 seconds apart from same player
 - Comprehensive death message parsing with regex patterns
@@ -57,6 +60,7 @@ src/
 ├── leaderboardService.ts # Daily leaderboard generation and scheduling
 ├── leaderboardFormatter.ts # Discord embed formatting for leaderboards
 ├── schedulerService.ts # Daily timing coordination for announcements
+├── timezoneUtils.ts # New York timezone conversion utilities
 ├── logger.ts       # Centralized logging service
 ├── config.ts       # Environment configuration loader
 └── types.ts        # TypeScript interfaces and types
@@ -90,6 +94,8 @@ Example: "I'll start the bot now. Please have a player die in-game to test the d
 ## Constitutional Requirements
 
 - Keep implementation simple and focused
+- All client-facing timestamps must be displayed in New York time (EST/EDT)
+- Database storage uses UTC timestamps for consistency
 - No testing framework (just make it work)
 - Friend-focused design with intuitive operation
 - Graceful error handling and safety measures

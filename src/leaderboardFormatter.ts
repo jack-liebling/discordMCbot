@@ -1,6 +1,7 @@
 // LeaderboardFormatter - Discord embed formatting for leaderboards
 import { EmbedBuilder } from "discord.js";
 import { DailyLeaderboard } from "./types";
+import { TimezoneUtils } from "./timezoneUtils";
 
 export class LeaderboardFormatter {
   /**
@@ -16,9 +17,9 @@ export class LeaderboardFormatter {
         .setTitle("🏆 Daily Death Leaderboard")
         .setDescription("Death counts for all tracked players")
         .setColor(0x8b4513) // Saddle brown color for death theme
-        .setTimestamp(leaderboard.generatedAt)
+        .setTimestamp(TimezoneUtils.toNewYorkTime(leaderboard.generatedAt))
         .setFooter({
-          text: `Generated for ${leaderboard.totalPlayers} players • Updated daily at 9:00 AM EST`,
+          text: `Generated for ${leaderboard.totalPlayers} players • Updated daily at 11:59 PM EST`,
         });
 
       // Generate rankings field
@@ -110,9 +111,9 @@ export class LeaderboardFormatter {
       .setTitle("🏆 Daily Death Leaderboard")
       .setDescription("No deaths recorded yet - everyone is surviving! 🎉")
       .setColor(0x90ee90) // Light green for no deaths
-      .setTimestamp()
+      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime())
       .setFooter({
-        text: "Updated daily at 9:00 AM EST",
+        text: "Updated daily at 11:59 PM EST",
       });
   }
 
@@ -182,15 +183,8 @@ export class LeaderboardFormatter {
    * Format date for display
    */
   private formatDate(date: Date): string {
-    const options: Intl.DateTimeFormatOptions = {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZoneName: "short",
-    };
-    return date.toLocaleString("en-US", options);
+    // Use TimezoneUtils for consistent New York time formatting
+    return TimezoneUtils.formatAsNewYorkTime(date, "long");
   }
 
   /**
@@ -203,9 +197,9 @@ export class LeaderboardFormatter {
         "⚠️ Error generating leaderboard - please try again later"
       )
       .setColor(0xff0000) // Red for error
-      .setTimestamp()
+      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime())
       .setFooter({
-        text: "Updated daily at 9:00 AM EST",
+        text: "Updated daily at 11:59 PM EST",
       });
   }
 }

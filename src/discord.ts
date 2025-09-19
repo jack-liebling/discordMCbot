@@ -2,6 +2,7 @@
 import { EmbedBuilder, ColorResolvable } from "discord.js";
 import { DeathEvent } from "./types";
 import { Logger } from "./logger";
+import { TimezoneUtils } from "./timezoneUtils";
 
 export class DiscordFormatter {
   private readonly logger = Logger.getInstance();
@@ -41,7 +42,7 @@ export class DiscordFormatter {
         }
       )
       .setFooter({ text: this.serverName })
-      .setTimestamp(deathEvent.timestamp);
+      .setTimestamp(TimezoneUtils.toNewYorkTime(deathEvent.timestamp));
 
     this.logger.debug("Created death announcement embed", {
       player: deathEvent.username,
@@ -58,7 +59,7 @@ export class DiscordFormatter {
       .setDescription(errorMessage)
       .setColor(0xffff00 as ColorResolvable) // Yellow color
       .setFooter({ text: "Bot will retry automatically" })
-      .setTimestamp();
+      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
 
     this.logger.debug("Created connection error embed", { errorMessage });
 
@@ -76,7 +77,7 @@ export class DiscordFormatter {
       .setTitle("🤖 Bot Online")
       .setDescription(`Monitoring ${this.serverName} for player deaths`)
       .setColor(0x00ff00 as ColorResolvable) // Green color
-      .setTimestamp();
+      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
 
     this.logger.debug("Created startup message embed");
 
@@ -88,7 +89,7 @@ export class DiscordFormatter {
       .setTitle("🤖 Bot Offline")
       .setDescription(`No longer monitoring ${this.serverName}`)
       .setColor(0xff8000 as ColorResolvable) // Orange color
-      .setTimestamp();
+      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
 
     this.logger.debug("Created shutdown message embed");
 
@@ -96,20 +97,8 @@ export class DiscordFormatter {
   }
 
   private formatTimestamp(timestamp: Date): string {
-    // Convert server timestamp to player timezone (subtract 4 hours)
-    const playerTime = new Date(timestamp.getTime() - 4 * 60 * 60 * 1000);
-
-    // Format as "Sep 16, 2025 at 10:25 AM"
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    };
-
-    return playerTime.toLocaleDateString("en-US", options);
+    // Use the timezone utility to properly convert to New York time
+    return TimezoneUtils.formatAsNewYorkTime(timestamp, "short");
   }
 
   private formatTimeSinceLastDeath(
@@ -120,41 +109,12 @@ export class DiscordFormatter {
       return "First death";
     }
 
-    const timeDiffMs =
-      currentDeathTimestamp.getTime() -
-      new Date(previousDeathTimestamp).getTime();
-    const timeDiffSeconds = Math.floor(timeDiffMs / 1000);
-
-    // Less than a minute
-    if (timeDiffSeconds < 60) {
-      return `${timeDiffSeconds} seconds ago`;
-    }
-
-    // Less than an hour
-    const minutes = Math.floor(timeDiffSeconds / 60);
-    if (minutes < 60) {
-      return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
-    }
-
-    // Less than a day
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      const remainingMinutes = minutes % 60;
-      if (remainingMinutes > 0) {
-        return `${hours}h ${remainingMinutes}m ago`;
-      }
-      const hourText = hours !== 1 ? "hours" : "hour";
-      return `${hours} ${hourText} ago`;
-    }
-
-    // Days
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    if (remainingHours > 0) {
-      return `${days}d ${remainingHours}h ago`;
-    }
-    const dayText = days !== 1 ? "days" : "day";
-    return `${days} ${dayText} ago`;
+    // Use the timezone utility for consistent time difference calculation
+    return TimezoneUtils.formatTimeDifference(
+      new Date(previousDeathTimestamp),
+      currentDeathTimestamp,
+      true // Use New York time for the calculation
+    );
   }
 
   // Utility method to sanitize death causes for Discord

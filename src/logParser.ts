@@ -186,7 +186,9 @@ export class LogParserService {
         }
 
         this.logger.debug(
-          `Parsed death from log: ${deathEvent.username} - ${deathEvent.cause}`
+          `Parsed death from log: ${deathEvent.username} - ${
+            deathEvent.cause
+          } at ${deathEvent.timestamp.toISOString()}`
         );
         this.onDeathCallback!(deathEvent);
       } else {
@@ -219,26 +221,16 @@ export class LogParserService {
     // [19:45:30] [Server thread/INFO]: Player was slain by Zombie
     // [19:45:30] [Server thread/INFO]: Player drowned
 
-    // Extract timestamp and message
+    // Extract timestamp pattern to validate this is a timestamped log line
     const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
     const timestampMatch = timestampPattern.exec(logLine);
     if (!timestampMatch) {
       return null;
     }
 
-    const timeStr = timestampMatch[1];
-
-    // Parse the timestamp from the log
-    const today = new Date();
-    const [hours, minutes, seconds] = timeStr.split(":").map(Number);
-    const timestamp = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      hours,
-      minutes,
-      seconds
-    );
+    // Use current time when processing the log entry
+    // This represents when the server actually wrote this log entry
+    const timestamp = new Date();
 
     // Look for death message patterns
     const deathPatterns = [
@@ -313,20 +305,10 @@ export class LogParserService {
     const match = joinPattern.exec(logLine);
 
     if (match) {
-      const timeStr = match[1];
       const username = match[2];
 
-      // Parse the timestamp from the log
-      const today = new Date();
-      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
-      const timestamp = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
+      // Use current time when processing the log entry
+      const timestamp = new Date();
 
       return { username, timestamp };
     }
@@ -347,40 +329,20 @@ export class LogParserService {
 
     let match = leavePattern1.exec(logLine);
     if (match) {
-      const timeStr = match[1];
       const username = match[2];
 
-      // Parse the timestamp from the log
-      const today = new Date();
-      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
-      const timestamp = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
+      // Use current time when processing the log entry
+      const timestamp = new Date();
 
       return { username, timestamp };
     }
 
     match = leavePattern2.exec(logLine);
     if (match) {
-      const timeStr = match[1];
       const username = match[2];
 
-      // Parse the timestamp from the log
-      const today = new Date();
-      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
-      const timestamp = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
+      // Use current time when processing the log entry
+      const timestamp = new Date();
 
       return { username, timestamp };
     }

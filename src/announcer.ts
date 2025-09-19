@@ -101,6 +101,7 @@ export class AnnouncementService {
 
       this.logger.info(`Death announcement sent for ${deathEvent.username}`, {
         cause: deathEvent.cause,
+        time: deathEvent.timestamp,
         totalDeaths,
         channel: this.channel.name,
       });
