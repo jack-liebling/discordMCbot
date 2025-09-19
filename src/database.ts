@@ -168,22 +168,55 @@ export class DatabaseService implements IStorageService {
   ): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query(
-        `
-        INSERT INTO players (username, total_deaths, last_join, last_leave)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (username) DO UPDATE SET
-          total_deaths = CASE WHEN $2 IS NOT NULL THEN $2 ELSE players.total_deaths END,
-          last_join = CASE WHEN $3 IS NOT NULL THEN $3 ELSE players.last_join END,
-          last_leave = CASE WHEN $4 IS NOT NULL THEN $4 ELSE players.last_leave END
-      `,
-        [
-          username,
-          playerData.totalDeaths ?? null,
-          playerData.lastJoin ?? null,
-          playerData.lastLeave ?? null,
-        ]
+      // Check if player exists first
+      const existingPlayer = await client.query(
+        "SELECT username FROM players WHERE username = $1",
+        [username]
       );
+
+      if (existingPlayer.rows.length > 0) {
+        // Player exists, do UPDATE only
+        const updateFields = [];
+        const updateValues: any[] = [username];
+        let paramIndex = 2;
+
+        if (playerData.totalDeaths !== undefined) {
+          updateFields.push(`total_deaths = $${paramIndex}`);
+          updateValues.push(playerData.totalDeaths);
+          paramIndex++;
+        }
+
+        if (playerData.lastJoin !== undefined) {
+          updateFields.push(`last_join = $${paramIndex}`);
+          updateValues.push(playerData.lastJoin);
+          paramIndex++;
+        }
+
+        if (playerData.lastLeave !== undefined) {
+          updateFields.push(`last_leave = $${paramIndex}`);
+          updateValues.push(playerData.lastLeave);
+          paramIndex++;
+        }
+
+        if (updateFields.length > 0) {
+          await client.query(
+            `UPDATE players SET ${updateFields.join(", ")} WHERE username = $1`,
+            updateValues
+          );
+        }
+      } else {
+        // Player doesn't exist, do INSERT with defaults
+        await client.query(
+          `INSERT INTO players (username, total_deaths, last_join, last_leave)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            username,
+            playerData.totalDeaths ?? 0,
+            playerData.lastJoin ?? null,
+            playerData.lastLeave ?? null,
+          ]
+        );
+      }
     } finally {
       client.release();
     }
