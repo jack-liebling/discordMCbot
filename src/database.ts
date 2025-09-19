@@ -4,8 +4,9 @@ import {
   Player,
   ConfigData,
   LogProcessingState,
-  PlayersData,
   IStorageService,
+  ActivityEvent,
+  ActivityEventType,
 } from "./types";
 import { Logger } from "./logger";
 
@@ -37,44 +38,6 @@ export class DatabaseService implements IStorageService {
   }
 
   /**
-   * Safely serialize data to JSON with error handling
-   */
-  private safeJsonStringify(data: any): string {
-    try {
-      return JSON.stringify(data, (key, value) => {
-        // Handle circular references
-        if (typeof value === "object" && value !== null) {
-          // Simple circular reference detection
-          if (value.constructor === Object || Array.isArray(value)) {
-            return value;
-          }
-          // Convert other objects to string representation
-          return value.toString();
-        }
-        // Filter out functions and undefined values
-        if (typeof value === "function" || value === undefined) {
-          return null;
-        }
-        return value;
-      });
-    } catch (error) {
-      this.logger.error("Failed to serialize data to JSON", error);
-      // Fallback: create a basic object with only serializable properties
-      try {
-        const fallback = JSON.parse(
-          JSON.stringify(data, Object.getOwnPropertyNames(data))
-        );
-        return JSON.stringify(fallback);
-      } catch (fallbackError) {
-        this.logger.error("Fallback serialization also failed", fallbackError);
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        throw new Error(`Unable to serialize data: ${errorMessage}`);
-      }
-    }
-  }
-
-  /**
    * Initialize database tables
    */
   async initialize(): Promise<void> {
@@ -94,19 +57,30 @@ export class DatabaseService implements IStorageService {
    * Create required database tables
    */
   private async createTables(client: PoolClient): Promise<void> {
-    // Players table
+    // Players table - tracks basic player stats
     await client.query(`
       CREATE TABLE IF NOT EXISTS players (
         username VARCHAR(255) PRIMARY KEY,
         total_deaths INTEGER NOT NULL DEFAULT 0,
-        last_death_timestamp TIMESTAMPTZ,
-        first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        last_seen_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        last_join TIMESTAMPTZ,
+        last_leave TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
 
-    // Configuration table
+    // Activity log table - tracks all player events
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('JOIN', 'LEAVE', 'DEATH', 'ACHIEVEMENT')),
+        timestamp TIMESTAMPTZ NOT NULL,
+        details TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Configuration table - minimal config storage
     await client.query(`
       CREATE TABLE IF NOT EXISTS config (
         key VARCHAR(255) PRIMARY KEY,
@@ -121,31 +95,39 @@ export class DatabaseService implements IStorageService {
     `);
 
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_players_last_seen ON players (last_seen_timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_activity_log_username ON activity_log (username);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_log_event_type ON activity_log (event_type);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log (timestamp DESC);
     `);
 
     this.logger.info("Database tables created/verified");
   }
 
   /**
-   * Get all players as PlayersData format
+   * Get all players
    */
-  async loadPlayers(): Promise<PlayersData> {
-    const players = await this.getPlayers();
-    return {
-      version: "1.1.0",
-      lastUpdated: new Date().toISOString(),
-      players,
-    };
-  }
+  async getAllPlayers(): Promise<Player[]> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        "SELECT * FROM players ORDER BY total_deaths DESC"
+      );
 
-  /**
-   * Save players data (compatible with PlayersData format)
-   */
-  async savePlayers(data: PlayersData): Promise<void> {
-    const players = Object.values(data.players);
-    for (const player of players) {
-      await this.savePlayer(player);
+      return result.rows.map((row) => ({
+        username: row.username,
+        totalDeaths: row.total_deaths,
+        lastJoin: row.last_join,
+        lastLeave: row.last_leave,
+        createdAt: row.created_at,
+      }));
+    } finally {
+      client.release();
     }
   }
 
@@ -168,10 +150,9 @@ export class DatabaseService implements IStorageService {
       return {
         username: row.username,
         totalDeaths: row.total_deaths,
-        lastDeathTimestamp: row.last_death_timestamp?.toISOString(),
-        firstSeen: row.first_seen.toISOString(),
-        lastUpdated: row.last_updated.toISOString(),
-        lastSeenTimestamp: row.last_seen_timestamp.toISOString(),
+        lastJoin: row.last_join,
+        lastLeave: row.last_leave,
+        createdAt: row.created_at,
       };
     } finally {
       client.release();
@@ -187,151 +168,20 @@ export class DatabaseService implements IStorageService {
   ): Promise<void> {
     const client = await this.pool.connect();
     try {
-      // First check if player exists
-      const existingResult = await client.query(
-        "SELECT * FROM players WHERE username = $1",
-        [username]
-      );
-
-      if (existingResult.rows.length === 0) {
-        // Create new player
-        const now = new Date().toISOString();
-        const newPlayer: Player = {
-          username,
-          totalDeaths: 0,
-          lastDeathTimestamp: null,
-          firstSeen: now,
-          lastUpdated: now,
-          lastSeenTimestamp: now,
-          ...playerData,
-        };
-        await this.savePlayer(newPlayer);
-      } else {
-        // Update existing player
-        const existingPlayer = {
-          username: existingResult.rows[0].username,
-          totalDeaths: existingResult.rows[0].total_deaths,
-          lastDeathTimestamp:
-            existingResult.rows[0].last_death_timestamp?.toISOString(),
-          firstSeen: existingResult.rows[0].first_seen.toISOString(),
-          lastUpdated: existingResult.rows[0].last_updated.toISOString(),
-          lastSeenTimestamp:
-            existingResult.rows[0].last_seen_timestamp.toISOString(),
-        };
-
-        const updatedPlayer = {
-          ...existingPlayer,
-          ...playerData,
-          lastUpdated: new Date().toISOString(),
-        };
-
-        await this.savePlayer(updatedPlayer);
-      }
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Load configuration (compatible with existing interface)
-   */
-  async loadConfig(): Promise<ConfigData | null> {
-    return await this.getConfig();
-  }
-
-  /**
-   * Initialize configuration with defaults
-   */
-  async initializeConfig(): Promise<void> {
-    try {
-      let config = await this.loadConfig();
-
-      // Create default config if it doesn't exist
-      if (!config) {
-        config = {
-          discord: { channelId: "", guildId: "", enabled: true },
-          leaderboard: {
-            enabled: true,
-            announcementTime: "09:00", // 9:00 AM
-            timezone: "EST",
-            lastAnnouncementDate: "1970-01-01", // Default to epoch date
-          },
-        };
-
-        this.logger.info("Initialized default configuration");
-        await this.saveConfig(config);
-      }
-
-      // Initialize leaderboard config with defaults if missing
-      if (!config.leaderboard) {
-        config.leaderboard = {
-          enabled: true,
-          announcementTime: "09:00", // 9:00 AM
-          timezone: "EST",
-          lastAnnouncementDate: "1970-01-01", // Default to epoch date
-        };
-
-        this.logger.info("Initialized default leaderboard configuration");
-        await this.saveConfig(config);
-      }
-    } catch (error) {
-      this.logger.error("Failed to initialize configuration:", error);
-    }
-  }
-
-  /**
-   * Get all players
-   */
-  async getPlayers(): Promise<{ [username: string]: Player }> {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query("SELECT * FROM players");
-      const players: { [username: string]: Player } = {};
-
-      for (const row of result.rows) {
-        players[row.username] = {
-          username: row.username,
-          totalDeaths: row.total_deaths,
-          lastDeathTimestamp: row.last_death_timestamp?.toISOString(),
-          firstSeen: row.first_seen.toISOString(),
-          lastUpdated: row.last_updated.toISOString(),
-          lastSeenTimestamp: row.last_seen_timestamp.toISOString(),
-        };
-      }
-
-      return players;
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Save or update a player
-   */
-  async savePlayer(player: Player): Promise<void> {
-    const client = await this.pool.connect();
-    try {
       await client.query(
         `
-        INSERT INTO players (
-          username, total_deaths, last_death_timestamp, 
-          first_seen, last_updated, last_seen_timestamp
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO players (username, total_deaths, last_join, last_leave)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (username) DO UPDATE SET
-          total_deaths = EXCLUDED.total_deaths,
-          last_death_timestamp = EXCLUDED.last_death_timestamp,
-          last_updated = EXCLUDED.last_updated,
-          last_seen_timestamp = EXCLUDED.last_seen_timestamp
+          total_deaths = COALESCE(EXCLUDED.total_deaths, players.total_deaths),
+          last_join = COALESCE(EXCLUDED.last_join, players.last_join),
+          last_leave = COALESCE(EXCLUDED.last_leave, players.last_leave)
       `,
         [
-          player.username,
-          player.totalDeaths,
-          player.lastDeathTimestamp
-            ? new Date(player.lastDeathTimestamp)
-            : null,
-          new Date(player.firstSeen),
-          new Date(player.lastUpdated),
-          new Date(player.lastSeenTimestamp),
+          username,
+          playerData.totalDeaths ?? 0,
+          playerData.lastJoin ?? null,
+          playerData.lastLeave ?? null,
         ]
       );
     } finally {
@@ -340,9 +190,98 @@ export class DatabaseService implements IStorageService {
   }
 
   /**
+   * Log a player activity event
+   */
+  async logActivity(activity: ActivityEvent): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(
+        `INSERT INTO activity_log (username, event_type, timestamp, details)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          activity.username,
+          activity.eventType,
+          activity.timestamp,
+          activity.details || null,
+        ]
+      );
+
+      this.logger.debug(
+        `Activity logged: ${activity.username} ${activity.eventType}`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get player activities
+   */
+  async getPlayerActivities(
+    username: string,
+    eventType?: ActivityEventType
+  ): Promise<ActivityEvent[]> {
+    const client = await this.pool.connect();
+    try {
+      let query = "SELECT * FROM activity_log WHERE username = $1";
+      const params: any[] = [username];
+
+      if (eventType) {
+        query += " AND event_type = $2";
+        params.push(eventType);
+      }
+
+      query += " ORDER BY timestamp DESC";
+
+      const result = await client.query(query, params);
+
+      return result.rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        eventType: row.event_type as ActivityEventType,
+        timestamp: row.timestamp,
+        details: row.details,
+        createdAt: row.created_at,
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get today's death events for leaderboard
+   */
+  async getDeathsToday(): Promise<ActivityEvent[]> {
+    const client = await this.pool.connect();
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const result = await client.query(
+        `SELECT * FROM activity_log 
+         WHERE event_type = 'DEATH' 
+         AND timestamp >= $1 
+         ORDER BY timestamp DESC`,
+        [today]
+      );
+
+      return result.rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        eventType: row.event_type as ActivityEventType,
+        timestamp: row.timestamp,
+        details: row.details,
+        createdAt: row.created_at,
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get configuration
    */
-  async getConfig(): Promise<ConfigData | null> {
+  async loadConfig(): Promise<ConfigData | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -366,7 +305,6 @@ export class DatabaseService implements IStorageService {
   async saveConfig(config: ConfigData): Promise<void> {
     const client = await this.pool.connect();
     try {
-      const serializedConfig = this.safeJsonStringify(config);
       await client.query(
         `
         INSERT INTO config (key, value, updated_at) VALUES ($1, $2, NOW())
@@ -374,7 +312,7 @@ export class DatabaseService implements IStorageService {
           value = EXCLUDED.value,
           updated_at = EXCLUDED.updated_at
       `,
-        ["app_config", serializedConfig]
+        ["app_config", JSON.stringify(config)]
       );
     } catch (error) {
       this.logger.error("Failed to save config to database", error);
@@ -414,13 +352,12 @@ export class DatabaseService implements IStorageService {
   async saveLogState(state: LogProcessingState): Promise<void> {
     const client = await this.pool.connect();
     try {
-      const serializedState = this.safeJsonStringify(state);
       await client.query(
         `INSERT INTO config (key, value) 
          VALUES ($1, $2) 
          ON CONFLICT (key) 
          DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
-        ["log_state", serializedState]
+        ["log_state", JSON.stringify(state)]
       );
 
       this.logger.debug("Log state saved to database");
@@ -429,6 +366,46 @@ export class DatabaseService implements IStorageService {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * Initialize configuration with defaults
+   */
+  async initializeConfig(): Promise<void> {
+    try {
+      let config = await this.loadConfig();
+
+      // Create default config if it doesn't exist
+      if (!config) {
+        config = {
+          discord: { channelId: "", guildId: "", enabled: true },
+          leaderboard: {
+            enabled: true,
+            announcementTime: "23:59", // 11:59 PM
+            timezone: "EST",
+            lastAnnouncementDate: "1970-01-01", // Default to epoch date
+          },
+        };
+
+        this.logger.info("Initialized default configuration");
+        await this.saveConfig(config);
+      }
+
+      // Initialize leaderboard config with defaults if missing
+      if (!config.leaderboard) {
+        config.leaderboard = {
+          enabled: true,
+          announcementTime: "23:59", // 11:59 PM
+          timezone: "EST",
+          lastAnnouncementDate: "1970-01-01", // Default to epoch date
+        };
+
+        this.logger.info("Initialized default leaderboard configuration");
+        await this.saveConfig(config);
+      }
+    } catch (error) {
+      this.logger.error("Failed to initialize configuration:", error);
     }
   }
 

@@ -140,19 +140,32 @@ export class DiscordBot {
       this.logger.info("Log parser service connected successfully");
 
       // Set up log-based death detection
-      this.logParserService.startMonitoring(async (deathEvent) => {
-        // Process death event from log
-        const result = await this.playerTracker.recordDeath(deathEvent);
+      this.logParserService.startMonitoring(
+        // Death callback
+        async (deathEvent) => {
+          // Process death event from log
+          const result = await this.playerTracker.recordDeath(deathEvent);
 
-        if (result.recorded && result.totalDeaths) {
-          // Announce the death
-          await this.announcementService.announcePlayerDeath(
-            deathEvent,
-            result.totalDeaths,
-            result.previousDeathTimestamp
-          );
+          if (result.recorded && result.totalDeaths) {
+            // Announce the death
+            await this.announcementService.announcePlayerDeath(
+              deathEvent,
+              result.totalDeaths,
+              result.previousDeathTimestamp || undefined
+            );
+          }
+        },
+        // Join callback
+        async (username) => {
+          await this.playerTracker.recordJoin(username);
+          this.logger.info(`Player joined: ${username}`);
+        },
+        // Leave callback
+        async (username) => {
+          await this.playerTracker.recordLeave(username);
+          this.logger.info(`Player left: ${username}`);
         }
-      });
+      );
 
       this.logger.info("Log-based death detection enabled");
 

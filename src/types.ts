@@ -1,21 +1,31 @@
 // Core type definitions for Discord MC Bot
 
-// T004: DeathEvent and Player interfaces
-export interface DeathEvent {
-  playerId: string;
-  timestamp: Date;
-  cause: string;
-  experienceLevel: number;
-  serverName: string;
-}
-
+// Player and activity event types
 export interface Player {
   username: string;
   totalDeaths: number;
-  lastDeathTimestamp: string | null;
-  firstSeen: string;
-  lastUpdated: string;
-  lastSeenTimestamp: string;
+  lastJoin: Date | null;
+  lastLeave: Date | null;
+  createdAt: Date;
+}
+
+// Activity log events
+export type ActivityEventType = "JOIN" | "LEAVE" | "DEATH" | "ACHIEVEMENT";
+
+export interface ActivityEvent {
+  id?: number;
+  username: string;
+  eventType: ActivityEventType;
+  timestamp: Date;
+  details?: string; // Death cause or achievement name
+  createdAt?: Date;
+}
+
+// Death event for announcements
+export interface DeathEvent {
+  username: string;
+  timestamp: Date;
+  cause: string;
 }
 
 // Daily leaderboard data structures
@@ -40,31 +50,24 @@ export interface SurvivalChampion {
   formattedTimeAlive: string; // Human-readable format
 }
 
-// T005: DiscordChannelConfig interface
+// Discord configuration
 export interface DiscordChannelConfig {
   channelId: string;
   guildId: string;
   enabled: boolean;
-  lastMessageId?: string;
 }
 
-// Data storage schemas
-export interface PlayersData {
-  version: string;
-  lastUpdated: string;
-  players: Record<string, Player>;
+// Simple configuration structure
+export interface ConfigData {
+  discord: DiscordChannelConfig;
+  logState?: LogProcessingState;
+  leaderboard?: LeaderboardConfig;
 }
 
 export interface LogProcessingState {
   lastProcessedPosition: number;
   lastProcessedTimestamp: string;
   lastUpdateTime: string;
-}
-
-export interface ConfigData {
-  discord: DiscordChannelConfig;
-  logState?: LogProcessingState;
-  leaderboard?: LeaderboardConfig;
 }
 
 export interface LeaderboardConfig {
@@ -106,8 +109,15 @@ export interface IStorageService {
   // Player management
   getPlayer(username: string): Promise<Player | null>;
   updatePlayer(username: string, playerData: Partial<Player>): Promise<void>;
-  loadPlayers(): Promise<PlayersData>;
-  savePlayers(data: PlayersData): Promise<void>;
+  getAllPlayers(): Promise<Player[]>;
+
+  // Activity logging
+  logActivity(activity: ActivityEvent): Promise<void>;
+  getPlayerActivities(
+    username: string,
+    eventType?: ActivityEventType
+  ): Promise<ActivityEvent[]>;
+  getDeathsToday(): Promise<ActivityEvent[]>;
 
   // Configuration management
   loadConfig(): Promise<ConfigData | null>;
@@ -116,4 +126,7 @@ export interface IStorageService {
   // Log state management
   getLogState(): Promise<LogProcessingState | null>;
   saveLogState(state: LogProcessingState): Promise<void>;
+
+  // Initialize with defaults
+  initializeConfig(): Promise<void>;
 }

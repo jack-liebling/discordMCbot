@@ -11,6 +11,8 @@ export class LogParserService {
   private lastLogPosition = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
+  private onJoinCallback: ((username: string) => void) | null = null;
+  private onLeaveCallback: ((username: string) => void) | null = null;
 
   constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
@@ -60,8 +62,14 @@ export class LogParserService {
     }
   }
 
-  startMonitoring(onDeath: (death: DeathEvent) => void): void {
+  startMonitoring(
+    onDeath: (death: DeathEvent) => void,
+    onJoin?: (username: string) => void,
+    onLeave?: (username: string) => void
+  ): void {
     this.onDeathCallback = onDeath;
+    this.onJoinCallback = onJoin || null;
+    this.onLeaveCallback = onLeave || null;
 
     // Check log file immediately
     this.checkLogFile();
@@ -153,9 +161,21 @@ export class LogParserService {
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
         this.logger.debug(
-          `Parsed death from log: ${deathEvent.playerId} - ${deathEvent.cause}`
+          `Parsed death from log: ${deathEvent.username} - ${deathEvent.cause}`
         );
         this.onDeathCallback!(deathEvent);
+      } else {
+        const joinEvent = this.parseJoinMessage(line);
+        if (joinEvent && this.onJoinCallback) {
+          this.logger.info(`Parsed join from log: ${joinEvent}`);
+          this.onJoinCallback(joinEvent);
+        } else {
+          const leaveEvent = this.parseLeaveMessage(line);
+          if (leaveEvent && this.onLeaveCallback) {
+            this.logger.info(`Parsed leave from log: ${leaveEvent}`);
+            this.onLeaveCallback(leaveEvent);
+          }
+        }
       }
     }
   }
@@ -167,7 +187,8 @@ export class LogParserService {
     // [19:45:30] [Server thread/INFO]: Player drowned
 
     // Extract timestamp and message
-    const timestampMatch = logLine.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+    const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
+    const timestampMatch = timestampPattern.exec(logLine);
     if (!timestampMatch) {
       return null;
     }
@@ -208,7 +229,7 @@ export class LogParserService {
     ];
 
     for (const pattern of deathPatterns) {
-      const match = logLine.match(pattern);
+      const match = pattern.exec(logLine);
       if (match) {
         const playerId = match[1];
         let cause = match[0].substring(playerId.length + 1); // Remove player name and space
@@ -241,13 +262,35 @@ export class LogParserService {
         );
 
         return {
-          playerId,
+          username: playerId,
           timestamp,
           cause,
-          experienceLevel: 0, // We'll get this via RCON if needed
-          serverName: "Minecraft Server",
         };
       }
+    }
+
+    return null;
+  }
+
+  private parseJoinMessage(logLine: string): string | null {
+    // Join message format: [16:34:59] [Server thread/INFO]: MaroonFranc joined the game
+    const joinPattern = /\[Server thread\/INFO\]:\s*(\w+)\s+joined the game/;
+    const match = joinPattern.exec(logLine);
+
+    if (match) {
+      return match[1]; // Return the username
+    }
+
+    return null;
+  }
+
+  private parseLeaveMessage(logLine: string): string | null {
+    // Leave message format: [16:37:04] [Server thread/INFO]: MaroonFranc left the game
+    const leavePattern = /\[Server thread\/INFO\]:\s*(\w+)\s+left the game/;
+    const match = leavePattern.exec(logLine);
+
+    if (match) {
+      return match[1]; // Return the username
     }
 
     return null;

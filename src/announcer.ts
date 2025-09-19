@@ -99,20 +99,20 @@ export class AnnouncementService {
 
       await this.channel.send({ embeds: [embed] });
 
-      this.logger.info(`Death announcement sent for ${deathEvent.playerId}`, {
+      this.logger.info(`Death announcement sent for ${deathEvent.username}`, {
         cause: deathEvent.cause,
         totalDeaths,
         channel: this.channel.name,
       });
     } catch (error) {
       this.logger.error(
-        `Failed to send death announcement for ${deathEvent.playerId}`,
+        `Failed to send death announcement for ${deathEvent.username}`,
         error
       );
 
       // Try to send a simplified message as fallback
       await this.sendFallbackMessage(
-        `💀 ${deathEvent.playerId} died (Death #${totalDeaths})`
+        `💀 ${deathEvent.username} died (Death #${totalDeaths})`
       );
     }
   }

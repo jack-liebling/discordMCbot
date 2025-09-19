@@ -1,11 +1,11 @@
 // T012: Player tracking service managing death counts and rate limiting
-import { Player, DeathEvent, IStorageService } from "./types";
+import { Player, DeathEvent, IStorageService, ActivityEvent } from "./types";
 import { Logger } from "./logger";
 
 export class PlayerTracker {
   private readonly storageService: IStorageService;
   private readonly logger = Logger.getInstance();
-  private readonly RATE_LIMIT_SECONDS = 30;
+  private readonly RATE_LIMIT_SECONDS = 10;
 
   constructor(storageService: IStorageService) {
     this.storageService = storageService;
@@ -26,14 +26,13 @@ export class PlayerTracker {
 
       if (!player) {
         // Create new player
-        const now = new Date().toISOString();
+        const now = new Date();
         player = {
           username,
           totalDeaths: 0,
-          lastDeathTimestamp: null,
-          firstSeen: now,
-          lastUpdated: now,
-          lastSeenTimestamp: now,
+          lastJoin: null,
+          lastLeave: null,
+          createdAt: now,
         };
 
         await this.storageService.updatePlayer(username, player);
@@ -49,128 +48,187 @@ export class PlayerTracker {
 
   async recordDeath(deathEvent: DeathEvent): Promise<{
     recorded: boolean;
-    reason?: string;
-    totalDeaths?: number;
-    previousDeathTimestamp?: string;
+    totalDeaths: number;
+    previousDeathTimestamp?: string | null;
   }> {
-    const username = deathEvent.playerId;
-
     try {
-      // Get or create player
-      const player = await this.createOrUpdatePlayer(username);
+      const username = deathEvent.username;
 
-      // Store previous death timestamp before rate limiting check
-      const previousDeathTimestamp = player.lastDeathTimestamp;
-
-      // Check rate limiting
-      if (this.isRateLimited(player, deathEvent.timestamp)) {
-        const timeSinceLastDeath =
-          deathEvent.timestamp.getTime() -
-          (player.lastDeathTimestamp
-            ? new Date(player.lastDeathTimestamp).getTime()
-            : 0);
-        const remainingCooldown = Math.ceil(
-          (this.RATE_LIMIT_SECONDS * 1000 - timeSinceLastDeath) / 1000
+      // Check for rate limiting using the new death's timestamp
+      const rateLimitResult = await this.checkRateLimit(
+        username,
+        deathEvent.timestamp
+      );
+      if (rateLimitResult.isLimited) {
+        this.logger.warn(
+          `Death rate limited for ${username} (${rateLimitResult.remainingSeconds}s remaining)`
         );
-
-        this.logger.info(
-          `Death for ${username} rate limited - ${remainingCooldown}s remaining`
-        );
-        return {
-          recorded: false,
-          reason: `Rate limited - ${remainingCooldown} seconds remaining`,
-        };
+        return { recorded: false, totalDeaths: 0 };
       }
 
-      // Record the death
-      const newTotalDeaths = player.totalDeaths + 1;
+      // Get or create player
+      let player = await this.storageService.getPlayer(username);
+      player ??= await this.createOrUpdatePlayer(username);
 
+      // Get previous death timestamp for announcement
+      const recentDeaths = await this.storageService.getPlayerActivities(
+        username,
+        "DEATH"
+      );
+      const previousDeathTimestamp =
+        recentDeaths.length > 0
+          ? recentDeaths[0].timestamp.toISOString()
+          : null;
+
+      // Log the death activity
+      const deathActivity: ActivityEvent = {
+        username,
+        eventType: "DEATH",
+        timestamp: deathEvent.timestamp,
+        details: deathEvent.cause,
+      };
+      await this.storageService.logActivity(deathActivity);
+
+      // Update player death count
+      const newTotalDeaths = player.totalDeaths + 1;
       await this.storageService.updatePlayer(username, {
         totalDeaths: newTotalDeaths,
-        lastDeathTimestamp: deathEvent.timestamp.toISOString(),
-        lastUpdated: new Date().toISOString(),
-        lastSeenTimestamp: deathEvent.timestamp.toISOString(), // Update activity tracking
       });
 
       this.logger.info(
-        `Recorded death #${newTotalDeaths} for ${username}: ${deathEvent.cause}`
+        `Recorded death for ${username} (Total: ${newTotalDeaths})`
       );
 
       return {
         recorded: true,
         totalDeaths: newTotalDeaths,
-        previousDeathTimestamp: previousDeathTimestamp || undefined,
+        previousDeathTimestamp,
       };
     } catch (error) {
-      this.logger.error(`Failed to record death for ${username}`, error);
-      return {
-        recorded: false,
-        reason: "Storage error occurred",
+      this.logger.error(
+        `Failed to record death for ${deathEvent.username}`,
+        error
+      );
+      return { recorded: false, totalDeaths: 0 };
+    }
+  }
+
+  async recordJoin(username: string): Promise<void> {
+    try {
+      const now = new Date();
+
+      // Ensure player exists
+      await this.createOrUpdatePlayer(username);
+
+      // Log join activity
+      const joinActivity: ActivityEvent = {
+        username,
+        eventType: "JOIN",
+        timestamp: now,
       };
+      await this.storageService.logActivity(joinActivity);
+
+      // Update player join timestamp
+      await this.storageService.updatePlayer(username, {
+        lastJoin: now,
+      });
+
+      this.logger.info(`Recorded join for ${username}`);
+    } catch (error) {
+      this.logger.error(`Failed to record join for ${username}`, error);
     }
   }
 
-  private isRateLimited(player: Player, currentDeathTime: Date): boolean {
-    if (!player.lastDeathTimestamp) {
-      return false; // No previous death, no rate limit
+  async recordLeave(username: string): Promise<void> {
+    try {
+      const now = new Date();
+
+      // Ensure player exists
+      await this.createOrUpdatePlayer(username);
+
+      // Log leave activity
+      const leaveActivity: ActivityEvent = {
+        username,
+        eventType: "LEAVE",
+        timestamp: now,
+      };
+      await this.storageService.logActivity(leaveActivity);
+
+      // Update player leave timestamp
+      await this.storageService.updatePlayer(username, {
+        lastLeave: now,
+      });
+
+      this.logger.info(`Recorded leave for ${username}`);
+    } catch (error) {
+      this.logger.error(`Failed to record leave for ${username}`, error);
     }
-
-    const timeSinceLastDeath =
-      currentDeathTime.getTime() -
-      new Date(player.lastDeathTimestamp).getTime();
-    const rateLimitMs = this.RATE_LIMIT_SECONDS * 1000;
-
-    return timeSinceLastDeath < rateLimitMs;
   }
 
-  async getPlayerStats(username: string): Promise<{
-    exists: boolean;
-    totalDeaths: number;
-    lastDeath: string | null;
-    firstSeen: string | null;
-    daysSinceFirstSeen: number;
+  async recordAchievement(
+    username: string,
+    achievementName: string
+  ): Promise<void> {
+    try {
+      const now = new Date();
+
+      // Log achievement activity
+      const achievementActivity: ActivityEvent = {
+        username,
+        eventType: "ACHIEVEMENT",
+        timestamp: now,
+        details: achievementName,
+      };
+      await this.storageService.logActivity(achievementActivity);
+
+      this.logger.debug(
+        `Recorded achievement for ${username}: ${achievementName}`
+      );
+    } catch (error) {
+      this.logger.error(`Failed to record achievement for ${username}`, error);
+    }
+  }
+
+  private async checkRateLimit(
+    username: string,
+    currentTimestamp?: Date
+  ): Promise<{
+    isLimited: boolean;
+    remainingSeconds: number;
   }> {
     try {
-      const player = await this.storageService.getPlayer(username);
-
-      if (!player) {
-        return {
-          exists: false,
-          totalDeaths: 0,
-          lastDeath: null,
-          firstSeen: null,
-          daysSinceFirstSeen: 0,
-        };
-      }
-
-      const daysSinceFirstSeen = Math.floor(
-        (Date.now() - new Date(player.firstSeen).getTime()) /
-          (1000 * 60 * 60 * 24)
+      const recentDeaths = await this.storageService.getPlayerActivities(
+        username,
+        "DEATH"
       );
 
-      return {
-        exists: true,
-        totalDeaths: player.totalDeaths,
-        lastDeath: player.lastDeathTimestamp,
-        firstSeen: player.firstSeen,
-        daysSinceFirstSeen,
-      };
+      if (recentDeaths.length === 0) {
+        return { isLimited: false, remainingSeconds: 0 }; // No previous deaths, not rate limited
+      }
+
+      const lastDeath = recentDeaths[0];
+      const currentTime = currentTimestamp
+        ? currentTimestamp.getTime()
+        : Date.now();
+      const timeSinceLastDeath = currentTime - lastDeath.timestamp.getTime();
+      const rateLimitMs = this.RATE_LIMIT_SECONDS * 1000;
+
+      if (timeSinceLastDeath < rateLimitMs) {
+        const remainingMs = rateLimitMs - timeSinceLastDeath;
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        return { isLimited: true, remainingSeconds };
+      }
+
+      return { isLimited: false, remainingSeconds: 0 };
     } catch (error) {
-      this.logger.error(`Failed to get stats for ${username}`, error);
-      return {
-        exists: false,
-        totalDeaths: 0,
-        lastDeath: null,
-        firstSeen: null,
-        daysSinceFirstSeen: 0,
-      };
+      this.logger.error(`Failed to check rate limit for ${username}`, error);
+      return { isLimited: false, remainingSeconds: 0 }; // Don't rate limit on error
     }
   }
 
   async getAllPlayers(): Promise<Player[]> {
     try {
-      const data = await this.storageService.loadPlayers();
-      return Object.values(data.players);
+      return await this.storageService.getAllPlayers();
     } catch (error) {
       this.logger.error("Failed to get all players", error);
       return [];
@@ -197,58 +255,44 @@ export class PlayerTracker {
     }
   }
 
-  async cleanupOldPlayers(daysInactive: number = 90): Promise<number> {
+  async getPlayerStats(username: string): Promise<{
+    totalDeaths: number;
+    daysSinceFirstSeen: number;
+    isActive: boolean;
+    recentActivity: ActivityEvent[];
+  } | null> {
     try {
-      const data = await this.storageService.loadPlayers();
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - daysInactive);
-
-      let removedCount = 0;
-      const playersToKeep: Record<string, Player> = {};
-
-      for (const [username, player] of Object.entries(data.players)) {
-        if (new Date(player.lastUpdated) > cutoffDate) {
-          playersToKeep[username] = player;
-        } else {
-          removedCount++;
-          this.logger.debug(`Removing inactive player: ${username}`);
-        }
+      const player = await this.getPlayer(username);
+      if (!player) {
+        return null;
       }
 
-      if (removedCount > 0) {
-        data.players = playersToKeep;
-        await this.storageService.savePlayers(data);
-        this.logger.info(`Cleaned up ${removedCount} inactive players`);
-      }
+      // Get recent activity (last 10 events)
+      const recentActivity = await this.storageService.getPlayerActivities(
+        username
+      );
 
-      return removedCount;
+      return {
+        totalDeaths: player.totalDeaths,
+        daysSinceFirstSeen: Math.floor(
+          (Date.now() - player.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+        ),
+        isActive: this.isPlayerActive(player),
+        recentActivity: recentActivity.slice(0, 10),
+      };
     } catch (error) {
-      this.logger.error("Failed to cleanup old players", error);
-      return 0;
+      this.logger.error(`Failed to get player stats for ${username}`, error);
+      return null;
     }
   }
 
-  // Method to get time until rate limit expires for a player
-  async getTimeUntilRateLimitExpires(username: string): Promise<number> {
-    try {
-      const player = await this.storageService.getPlayer(username);
-
-      if (!player?.lastDeathTimestamp) {
-        return 0; // No rate limit
-      }
-
-      const timeSinceLastDeath =
-        Date.now() - new Date(player.lastDeathTimestamp).getTime();
-      const rateLimitMs = this.RATE_LIMIT_SECONDS * 1000;
-
-      if (timeSinceLastDeath >= rateLimitMs) {
-        return 0; // Rate limit expired
-      }
-
-      return Math.ceil((rateLimitMs - timeSinceLastDeath) / 1000);
-    } catch (error) {
-      this.logger.error(`Failed to get rate limit info for ${username}`, error);
-      return 0;
+  private isPlayerActive(player: Player): boolean {
+    // Consider active if they've joined in the last 7 days
+    if (!player.lastJoin) {
+      return false;
     }
+
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return player.lastJoin.getTime() > sevenDaysAgo;
   }
 }

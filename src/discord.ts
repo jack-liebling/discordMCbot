@@ -18,7 +18,7 @@ export class DiscordFormatter {
   ): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle("💀 Player Death Alert")
-      .setDescription(`${deathEvent.playerId} ${deathEvent.cause}`)
+      .setDescription(`${deathEvent.username} ${deathEvent.cause}`)
       .setColor(0xff0000 as ColorResolvable) // Red color
       .addFields(
         {
@@ -44,7 +44,7 @@ export class DiscordFormatter {
       .setTimestamp(deathEvent.timestamp);
 
     this.logger.debug("Created death announcement embed", {
-      player: deathEvent.playerId,
+      player: deathEvent.username,
       cause: deathEvent.cause,
       totalDeaths,
     });
