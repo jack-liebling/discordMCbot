@@ -172,4 +172,59 @@ export class DiscordFormatter {
       errors,
     };
   }
+
+  /**
+   * Create a player join announcement embed
+   */
+  createJoinAnnouncementEmbed(
+    username: string,
+    timestamp: Date,
+    craftersRoleId: string
+  ): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setTitle("🟢 Player Joined")
+      .setDescription(
+        `<@&${craftersRoleId}> ${username} has joined the server!`
+      )
+      .setColor(0x00ff00 as ColorResolvable) // Green color
+      .addFields({
+        name: "Join Time",
+        value: this.formatTimestamp(timestamp),
+        inline: true,
+      })
+      .setFooter({ text: this.serverName })
+      .setTimestamp(TimezoneUtils.toNewYorkTime(timestamp));
+
+    this.logger.debug("Created join announcement embed", {
+      player: username,
+    });
+
+    return embed;
+  }
+
+  /**
+   * Create a player leave announcement embed (for logging purposes)
+   */
+  createLeaveAnnouncementEmbed(
+    username: string,
+    timestamp: Date
+  ): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setTitle("🔴 Player Left")
+      .setDescription(`${username} has left the server`)
+      .setColor(0xff6600 as ColorResolvable) // Orange color
+      .addFields({
+        name: "Leave Time",
+        value: this.formatTimestamp(timestamp),
+        inline: true,
+      })
+      .setFooter({ text: this.serverName })
+      .setTimestamp(TimezoneUtils.toNewYorkTime(timestamp));
+
+    this.logger.debug("Created leave announcement embed", {
+      player: username,
+    });
+
+    return embed;
+  }
 }

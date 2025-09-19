@@ -326,6 +326,7 @@ export class AnnouncementService {
    */
   async announcePlayerJoin(
     username: string,
+    timestamp: Date,
     whoIsOnChannelId: string,
     craftersRoleId: string
   ): Promise<JoinMessage | null> {
@@ -346,15 +347,29 @@ export class AnnouncementService {
         return null;
       }
 
-      const message = await channel.send({
-        content: `🟢 ${username} joined the server! <@&${craftersRoleId}>`,
-      });
+      // Create a pretty embed for the join announcement
+      const embed = this.formatter.createJoinAnnouncementEmbed(
+        username,
+        timestamp,
+        craftersRoleId
+      );
+
+      // Validate embed before sending
+      const validation = this.formatter.validateEmbed(embed);
+      if (!validation.isValid) {
+        this.logger.error("Invalid join embed created", {
+          errors: validation.errors,
+        });
+        return null;
+      }
+
+      const message = await channel.send({ embeds: [embed] });
 
       const joinMessage: JoinMessage = {
         username: username,
         messageId: message.id,
         channelId: whoIsOnChannelId,
-        timestamp: new Date(),
+        timestamp: timestamp,
       };
 
       this.logger.info(`Join announcement sent for ${username}`, {
@@ -442,10 +457,11 @@ export class AnnouncementService {
 
       let cleanedCount = 0;
       for (const message of messages.values()) {
-        // Check if this is a bot join message (contains "joined the server!")
+        // Check if this is a bot join message (embed with "Player Joined" title)
         if (
           message.author.id === this.client.user?.id &&
-          message.content.includes("joined the server!")
+          message.embeds.length > 0 &&
+          message.embeds[0].title === "🟢 Player Joined"
         ) {
           try {
             await message.delete();

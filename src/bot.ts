@@ -170,6 +170,7 @@ export class DiscordBot {
             const joinMessage =
               await this.announcementService.announcePlayerJoin(
                 username,
+                timestamp,
                 joinLeaveConfig.whoIsOnChannelId,
                 joinLeaveConfig.craftersRoleId
               );
