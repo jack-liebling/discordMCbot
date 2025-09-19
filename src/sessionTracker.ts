@@ -288,4 +288,53 @@ export class SessionTracker {
     const minuteText = minutes === 1 ? "minute" : "minutes";
     return `${minutes} ${minuteText}`;
   }
+
+  /**
+   * Calculate current session time (from last JOIN to specified time)
+   */
+  async calculateCurrentSessionTime(
+    username: string,
+    endTime: Date
+  ): Promise<number> {
+    try {
+      // Get the most recent JOIN event
+      const joinEvents = await this.storageService.getPlayerActivities(
+        username,
+        "JOIN"
+      );
+
+      if (joinEvents.length === 0) {
+        return 0; // No JOIN events found
+      }
+
+      const lastJoin = joinEvents[0]; // Most recent JOIN
+
+      // Check if there's a LEAVE event after this JOIN
+      const leaveEvents = await this.storageService.getPlayerActivities(
+        username,
+        "LEAVE"
+      );
+
+      // Find if there's a LEAVE after the last JOIN
+      const leaveAfterJoin = leaveEvents.find(
+        (leave) => leave.timestamp > lastJoin.timestamp
+      );
+
+      if (leaveAfterJoin) {
+        // Player has already left, no current session
+        return 0;
+      }
+
+      // Calculate time from last JOIN to the specified end time
+      const sessionDuration = endTime.getTime() - lastJoin.timestamp.getTime();
+
+      return Math.max(0, sessionDuration); // Ensure non-negative
+    } catch (error) {
+      this.logger.error(
+        `Failed to calculate current session time for ${username}`,
+        error
+      );
+      return 0;
+    }
+  }
 }

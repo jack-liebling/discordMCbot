@@ -88,7 +88,7 @@ export class AnnouncementService {
     }
 
     try {
-      const embed = this.formatter.createDeathAnnouncementEmbed(
+      const embed = await this.formatter.createDeathAnnouncementEmbed(
         deathEvent,
         totalDeaths,
         previousDeathTimestamp

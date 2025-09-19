@@ -1,22 +1,68 @@
 // T011: Discord message formatter creating death announcement embeds
 import { EmbedBuilder, ColorResolvable } from "discord.js";
-import { DeathEvent } from "./types";
+import { DeathEvent, IStorageService } from "./types";
 import { Logger } from "./logger";
 import { TimezoneUtils } from "./timezoneUtils";
+import { SessionTracker } from "./sessionTracker";
 
 export class DiscordFormatter {
   private readonly logger = Logger.getInstance();
   private readonly serverName: string;
+  private readonly sessionTracker: SessionTracker;
 
-  constructor(serverName: string) {
+  constructor(serverName: string, storageService: IStorageService) {
     this.serverName = serverName;
+    this.sessionTracker = new SessionTracker(storageService);
   }
 
-  createDeathAnnouncementEmbed(
+  async createDeathAnnouncementEmbed(
     deathEvent: DeathEvent,
     totalDeaths: number,
     previousDeathTimestamp?: string | null
-  ): EmbedBuilder {
+  ): Promise<EmbedBuilder> {
+    // Calculate online time since last death including current session
+    let onlineTimeSinceLastDeath: string;
+    if (!previousDeathTimestamp) {
+      // First death - calculate total online time including current session
+      const storedOnlineTime = await this.sessionTracker.calculateOnlineTime(
+        deathEvent.username
+      );
+
+      // Add current session time (from last JOIN to now)
+      const currentSessionTime =
+        await this.sessionTracker.calculateCurrentSessionTime(
+          deathEvent.username,
+          deathEvent.timestamp
+        );
+
+      const totalOnlineTimeMs = storedOnlineTime + currentSessionTime;
+      onlineTimeSinceLastDeath =
+        totalOnlineTimeMs > 0
+          ? this.sessionTracker.formatOnlineTime(totalOnlineTimeMs)
+          : "First session";
+    } else {
+      // Calculate online time since last death including current session
+      const lastDeathTime = new Date(previousDeathTimestamp);
+
+      // Get online time from completed sessions since last death
+      const completedSessionsTime =
+        await this.sessionTracker.calculateOnlineTimeSince(
+          deathEvent.username,
+          lastDeathTime
+        );
+
+      // Add current session time (from last JOIN to death time)
+      const currentSessionTime =
+        await this.sessionTracker.calculateCurrentSessionTime(
+          deathEvent.username,
+          deathEvent.timestamp
+        );
+
+      const totalOnlineTimeMs = completedSessionsTime + currentSessionTime;
+      onlineTimeSinceLastDeath =
+        this.sessionTracker.formatOnlineTime(totalOnlineTimeMs);
+    }
+
     const embed = new EmbedBuilder()
       .setTitle("💀 Player Death Alert")
       .setDescription(`${deathEvent.username} ${deathEvent.cause}`)
@@ -28,11 +74,8 @@ export class DiscordFormatter {
           inline: true,
         },
         {
-          name: "Time Since Last Death",
-          value: this.formatTimeSinceLastDeath(
-            previousDeathTimestamp,
-            deathEvent.timestamp
-          ),
+          name: "Survived For",
+          value: onlineTimeSinceLastDeath,
           inline: true,
         },
         {
@@ -48,6 +91,7 @@ export class DiscordFormatter {
       player: deathEvent.username,
       cause: deathEvent.cause,
       totalDeaths,
+      onlineTimeSinceLastDeath,
     });
 
     return embed;

@@ -112,7 +112,10 @@ export class DiscordBot {
       const discordConfig = this.configLoader.getDiscordConfig();
 
       // Initialize Discord formatter (use generic server name)
-      this.formatter = new DiscordFormatter("Minecraft Server");
+      this.formatter = new DiscordFormatter(
+        "Minecraft Server",
+        this.storageService
+      );
 
       // Initialize player tracker with type-safe storage interface
       this.playerTracker = new PlayerTracker(this.storageService);
