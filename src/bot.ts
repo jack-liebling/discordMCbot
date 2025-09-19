@@ -139,6 +139,11 @@ export class DiscordBot {
         this.storageService
       );
 
+      // Enable skip old events mode if configured
+      if (this.configLoader.shouldSkipOldEventsOnStartup()) {
+        this.logParserService.enableSkipOldEvents();
+      }
+
       await this.logParserService.connect();
       this.logger.info("Log parser service connected successfully");
 
@@ -378,6 +383,9 @@ export class DiscordBot {
           .setDescription(
             "Reset the daily announcement flag for testing (admin only)"
           ),
+        new SlashCommandBuilder()
+          .setName("reset-deaths")
+          .setDescription("Reset all player death counts to zero (admin only)"),
       ];
 
       const discordConfig = this.configLoader.getDiscordConfig();
@@ -441,6 +449,11 @@ export class DiscordBot {
             .setDescription(
               "Reset the daily announcement flag for testing (admin only)"
             ),
+          new SlashCommandBuilder()
+            .setName("reset-deaths")
+            .setDescription(
+              "Reset all player death counts to zero (admin only)"
+            ),
         ];
 
         await rest.put(Routes.applicationCommands(this.client.user!.id), {
@@ -469,6 +482,8 @@ export class DiscordBot {
         await this.handleTestLeaderboardCommand(interaction);
       } else if (interaction.commandName === "reset-leaderboard") {
         await this.handleResetLeaderboardCommand(interaction);
+      } else if (interaction.commandName === "reset-deaths") {
+        await this.handleResetDeathsCommand(interaction);
       }
     } catch (error) {
       this.logger.error(
@@ -483,6 +498,11 @@ export class DiscordBot {
         });
       }
     }
+  }
+
+  private isUserAdmin(userId: string): boolean {
+    const adminUserIds = this.configLoader.getAdminUserIds();
+    return adminUserIds.includes(userId);
   }
 
   private async handleLeaderboardCommand(
@@ -518,6 +538,15 @@ export class DiscordBot {
     interaction: ChatInputCommandInteraction
   ): Promise<void> {
     try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
       // Defer reply since this might take a moment
       await interaction.deferReply({ ephemeral: true });
 
@@ -549,6 +578,15 @@ export class DiscordBot {
     interaction: ChatInputCommandInteraction
   ): Promise<void> {
     try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
       // Defer reply since this might take a moment
       await interaction.deferReply({ ephemeral: true });
 
@@ -569,6 +607,44 @@ export class DiscordBot {
       await interaction.editReply({
         content:
           "❌ Failed to reset announcement flag. Please try again later.",
+      });
+    }
+  }
+
+  private async handleResetDeathsCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Reset all player death counts
+      const resetCount = await this.storageService.resetAllPlayerDeaths();
+
+      await interaction.editReply({
+        content:
+          resetCount > 0
+            ? `✅ Successfully reset death counts for ${resetCount} players.`
+            : "✅ All player death counts were already at zero.",
+      });
+
+      this.logger.info(
+        `Death counts reset by ${interaction.user.tag} - ${resetCount} players affected`
+      );
+    } catch (error) {
+      this.logger.error("Failed to reset player death counts", error);
+
+      await interaction.editReply({
+        content: "❌ Failed to reset death counts. Please try again later.",
       });
     }
   }
