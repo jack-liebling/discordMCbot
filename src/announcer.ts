@@ -482,7 +482,12 @@ export class AnnouncementService {
             await storageService.deleteJoinMessage(username);
             this.logger.info(`Delayed deletion completed for ${username}`);
           } else {
-            this.logger.warn(`Failed delayed deletion for ${username}`);
+            // If Discord message deletion failed, assume message no longer exists
+            // and clean up the database entry anyway
+            await storageService.deleteJoinMessage(username);
+            this.logger.warn(
+              `Discord message deletion failed for ${username}, but cleaned up database entry (message likely already deleted)`
+            );
           }
         }
       } catch (error) {
