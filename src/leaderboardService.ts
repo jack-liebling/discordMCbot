@@ -8,13 +8,16 @@ import {
   ConfigData,
 } from "./types";
 import { Logger } from "./logger";
+import { SessionTracker } from "./sessionTracker";
 
 export class LeaderboardService {
   private readonly storageService: IStorageService;
+  private readonly sessionTracker: SessionTracker;
   private readonly logger = Logger.getInstance();
 
   constructor(storageService: IStorageService) {
     this.storageService = storageService;
+    this.sessionTracker = new SessionTracker(storageService);
   }
 
   /**
@@ -148,7 +151,7 @@ export class LeaderboardService {
   }
 
   /**
-   * Get survival champion (longest time without death among active players)
+   * Get survival champion (longest online time without death among active players)
    */
   private async getSurvivalChampion(
     activePlayers: Player[]
@@ -159,7 +162,7 @@ export class LeaderboardService {
 
     let champion: Player | null = null;
     let longestSurvival = 0;
-    let lastDeathTimestamp: string | null = null;
+    let championLastDeathTimestamp: string | null = null;
 
     for (const player of activePlayers) {
       try {
@@ -169,21 +172,41 @@ export class LeaderboardService {
           "DEATH"
         );
 
-        let timeSinceLastDeath: number;
+        let onlineTimeSinceLastDeath: number;
+        let playerLastDeathTimestamp: string | null;
+
         if (deathEvents.length === 0) {
-          // No deaths recorded, use time since creation
-          timeSinceLastDeath = Date.now() - player.createdAt.getTime();
-          lastDeathTimestamp = null;
+          // No deaths recorded, use total online time
+          onlineTimeSinceLastDeath = player.onlineTimeMs;
+          playerLastDeathTimestamp = null;
+          this.logger.info(
+            `${player.username}: No deaths, total online time: ${onlineTimeSinceLastDeath}ms`
+          );
         } else {
-          // Time since last death
+          // Online time since last death
           const lastDeath = deathEvents[0]; // Most recent death
-          timeSinceLastDeath = Date.now() - lastDeath.timestamp.getTime();
-          lastDeathTimestamp = lastDeath.timestamp.toISOString();
+          onlineTimeSinceLastDeath =
+            await this.sessionTracker.calculateOnlineTimeSince(
+              player.username,
+              lastDeath.timestamp
+            );
+          playerLastDeathTimestamp = lastDeath.timestamp.toISOString();
+          this.logger.info(
+            `${player.username}: ${deathEvents.length} deaths, online time since last death: ${onlineTimeSinceLastDeath}ms`
+          );
         }
 
-        if (timeSinceLastDeath > longestSurvival) {
-          longestSurvival = timeSinceLastDeath;
+        if (onlineTimeSinceLastDeath > longestSurvival) {
+          longestSurvival = onlineTimeSinceLastDeath;
           champion = player;
+          championLastDeathTimestamp = playerLastDeathTimestamp;
+          this.logger.info(
+            `New survival champion: ${player.username} with ${onlineTimeSinceLastDeath}ms`
+          );
+        } else {
+          this.logger.info(
+            `${player.username} not champion: ${onlineTimeSinceLastDeath}ms < current best ${longestSurvival}ms`
+          );
         }
       } catch (error) {
         this.logger.warn(
@@ -200,8 +223,8 @@ export class LeaderboardService {
     return {
       username: champion.username,
       timeAliveMs: longestSurvival,
-      lastDeathTimestamp,
-      formattedTimeAlive: this.formatTimeAlive(longestSurvival),
+      lastDeathTimestamp: championLastDeathTimestamp,
+      formattedTimeAlive: this.sessionTracker.formatOnlineTime(longestSurvival),
     };
   }
 
@@ -422,6 +445,18 @@ export class LeaderboardService {
       this.logger.info("Reset daily leaderboard announcement flag");
     } catch (error) {
       this.logger.error("Failed to reset announcement flag", error);
+    }
+  }
+
+  /**
+   * Update online time for all players (useful for fixing 0ms issues)
+   */
+  async updateAllPlayersOnlineTime(): Promise<void> {
+    try {
+      await this.sessionTracker.updateAllPlayersOnlineTime();
+      this.logger.info("Updated online time for all players");
+    } catch (error) {
+      this.logger.error("Failed to update online time for all players", error);
     }
   }
 }

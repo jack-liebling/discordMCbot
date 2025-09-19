@@ -4,6 +4,7 @@
 export interface Player {
   username: string;
   totalDeaths: number;
+  onlineTimeMs: number;
   lastJoin: Date | null;
   lastLeave: Date | null;
   createdAt: Date;

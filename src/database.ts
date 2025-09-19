@@ -63,6 +63,7 @@ export class DatabaseService implements IStorageService {
       CREATE TABLE IF NOT EXISTS players (
         username VARCHAR(255) PRIMARY KEY,
         total_deaths INTEGER NOT NULL DEFAULT 0,
+        online_time_ms BIGINT NOT NULL DEFAULT 0,
         last_join TIMESTAMPTZ,
         last_leave TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -155,6 +156,27 @@ export class DatabaseService implements IStorageService {
       throw error;
     }
 
+    // Migration: Add online_time_ms column to existing players table if it doesn't exist
+    try {
+      const result = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'players' 
+        AND column_name = 'online_time_ms'
+      `);
+
+      if (result.rows.length === 0) {
+        await client.query(
+          `ALTER TABLE players ADD COLUMN online_time_ms BIGINT DEFAULT 0`
+        );
+        this.logger.debug("Added online_time_ms column to players table");
+      }
+
+      this.logger.debug("Players table migration completed");
+    } catch (error) {
+      this.logger.error("Players table migration failed", error);
+      throw error;
+    }
+
     this.logger.info("Database tables created/verified");
   }
 
@@ -171,6 +193,7 @@ export class DatabaseService implements IStorageService {
       return result.rows.map((row) => ({
         username: row.username,
         totalDeaths: row.total_deaths,
+        onlineTimeMs: parseInt(row.online_time_ms) || 0,
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
         createdAt: row.created_at,
@@ -199,6 +222,7 @@ export class DatabaseService implements IStorageService {
       return {
         username: row.username,
         totalDeaths: row.total_deaths,
+        onlineTimeMs: parseInt(row.online_time_ms) || 0,
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
         createdAt: row.created_at,
@@ -235,6 +259,12 @@ export class DatabaseService implements IStorageService {
           paramIndex++;
         }
 
+        if (playerData.onlineTimeMs !== undefined) {
+          updateFields.push(`online_time_ms = $${paramIndex}`);
+          updateValues.push(playerData.onlineTimeMs);
+          paramIndex++;
+        }
+
         if (playerData.lastJoin !== undefined) {
           updateFields.push(`last_join = $${paramIndex}`);
           updateValues.push(playerData.lastJoin);
@@ -256,11 +286,12 @@ export class DatabaseService implements IStorageService {
       } else {
         // Player doesn't exist, do INSERT with defaults
         await client.query(
-          `INSERT INTO players (username, total_deaths, last_join, last_leave)
-           VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave)
+           VALUES ($1, $2, $3, $4, $5)`,
           [
             username,
             playerData.totalDeaths ?? 0,
+            playerData.onlineTimeMs ?? 0,
             playerData.lastJoin ?? null,
             playerData.lastLeave ?? null,
           ]

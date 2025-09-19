@@ -1,14 +1,17 @@
 // T012: Player tracking service managing death counts and rate limiting
 import { Player, DeathEvent, IStorageService, ActivityEvent } from "./types";
 import { Logger } from "./logger";
+import { SessionTracker } from "./sessionTracker";
 
 export class PlayerTracker {
   private readonly storageService: IStorageService;
+  private readonly sessionTracker: SessionTracker;
   private readonly logger = Logger.getInstance();
   private readonly RATE_LIMIT_SECONDS = 10;
 
   constructor(storageService: IStorageService) {
     this.storageService = storageService;
+    this.sessionTracker = new SessionTracker(storageService);
   }
 
   async getPlayer(username: string): Promise<Player | null> {
@@ -27,16 +30,18 @@ export class PlayerTracker {
       if (!player) {
         // Create new player
         const now = new Date();
-        player = {
+        const newPlayer: Player = {
           username,
           totalDeaths: 0,
+          onlineTimeMs: 0,
           lastJoin: null,
           lastLeave: null,
           createdAt: now,
         };
 
-        await this.storageService.updatePlayer(username, player);
+        await this.storageService.updatePlayer(username, newPlayer);
         this.logger.info(`Created new player record for ${username}`);
+        return newPlayer;
       }
 
       return player;
@@ -158,6 +163,8 @@ export class PlayerTracker {
         lastJoin: timestamp,
       });
 
+      // Note: Online time will be updated when player leaves and session is complete
+
       this.logger.info(`Recorded join for ${username}`);
     } catch (error) {
       this.logger.error(`Failed to record join for ${username}`, error);
@@ -204,6 +211,9 @@ export class PlayerTracker {
       await this.storageService.updatePlayer(username, {
         lastLeave: timestamp,
       });
+
+      // Update online time after leave (calculate total sessions)
+      await this.sessionTracker.updatePlayerOnlineTime(username);
 
       this.logger.info(`Recorded leave for ${username}`);
     } catch (error) {
@@ -340,5 +350,17 @@ export class PlayerTracker {
 
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     return player.lastJoin.getTime() > sevenDaysAgo;
+  }
+
+  /**
+   * Update online time for all players (useful on bot startup)
+   */
+  async updateAllPlayersOnlineTime(): Promise<void> {
+    try {
+      await this.sessionTracker.updateAllPlayersOnlineTime();
+      this.logger.info("Updated online time for all players");
+    } catch (error) {
+      this.logger.error("Failed to update online time for all players", error);
+    }
   }
 }
