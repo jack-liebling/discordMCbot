@@ -43,7 +43,7 @@ export class DiscordFormatter {
         }
       )
       .setFooter({ text: this.serverName })
-      .setTimestamp(deathEvent.timestamp);
+      .setTimestamp(deathEvent.timestamp); // deathEvent.timestamp is already in EDT
 
     this.logger.debug("Created death announcement embed", {
       player: deathEvent.playerId,
@@ -98,6 +98,9 @@ export class DiscordFormatter {
   }
 
   createSessionJoinEmbed(sessionEvent: SessionEvent): EmbedBuilder {
+    // Convert UTC timestamp to EDT for display
+    const edtTimestamp = this.convertUTCToTimezone(sessionEvent.timestamp);
+
     const embed = new EmbedBuilder()
       .setTitle("🟢 Player Joined")
       .setDescription(`**${sessionEvent.username}** joined the server`)
@@ -108,11 +111,13 @@ export class DiscordFormatter {
         inline: true,
       })
       .setFooter({ text: `${this.serverName} • Welcome!` })
-      .setTimestamp(sessionEvent.timestamp);
+      .setTimestamp(edtTimestamp); // Use EDT timestamp for Discord's timestamp display
 
     this.logger.debug("Created session join embed", {
       username: sessionEvent.username,
       timestamp: sessionEvent.timestamp,
+      edtTimestamp: edtTimestamp,
+      formattedTime: this.formatTimestamp(sessionEvent.timestamp),
     });
 
     return embed;
@@ -141,6 +146,39 @@ export class DiscordFormatter {
     };
 
     return timestamp.toLocaleString("en-US", options);
+  }
+
+  /**
+   * Convert UTC timestamp to the configured timezone for Discord's .setTimestamp()
+   * This is needed because session events come with UTC timestamps but we want to display in EDT
+   */
+  private convertUTCToTimezone(utcTimestamp: Date): Date {
+    // Create a date formatter for the target timezone
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: this.timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+
+    // Format the UTC time in the target timezone
+    const parts = formatter.formatToParts(utcTimestamp);
+    const partsObj = parts.reduce((acc, part) => {
+      acc[part.type] = part.value;
+      return acc;
+    }, {} as any);
+
+    // Create a new date object representing the local time as if it were UTC
+    // This tricks Discord's .setTimestamp() into showing the EDT time
+    const localAsUtc = new Date(
+      `${partsObj.year}-${partsObj.month}-${partsObj.day}T${partsObj.hour}:${partsObj.minute}:${partsObj.second}.000Z`
+    );
+
+    return localAsUtc;
   }
 
   private formatTimeSinceLastDeath(
