@@ -387,6 +387,17 @@ export class DiscordBot {
           .setName("reset-deaths")
           .setDescription("Reset all player death counts to zero (admin only)"),
         new SlashCommandBuilder()
+          .setName("remove-player")
+          .setDescription(
+            "Remove a player from the database completely (admin only)"
+          )
+          .addStringOption((option) =>
+            option
+              .setName("username")
+              .setDescription("Username of the player to remove")
+              .setRequired(true)
+          ),
+        new SlashCommandBuilder()
           .setName("clear-channel")
           .setDescription(
             "Clear all messages from the current channel (admin only)"
@@ -470,6 +481,17 @@ export class DiscordBot {
               "Reset all player death counts to zero (admin only)"
             ),
           new SlashCommandBuilder()
+            .setName("remove-player")
+            .setDescription(
+              "Remove a player from the database completely (admin only)"
+            )
+            .addStringOption((option) =>
+              option
+                .setName("username")
+                .setDescription("Username of the player to remove")
+                .setRequired(true)
+            ),
+          new SlashCommandBuilder()
             .setName("clear-channel")
             .setDescription(
               "Clear all messages from the current channel (admin only)"
@@ -514,6 +536,8 @@ export class DiscordBot {
         await this.handleResetLeaderboardCommand(interaction);
       } else if (interaction.commandName === "reset-deaths") {
         await this.handleResetDeathsCommand(interaction);
+      } else if (interaction.commandName === "remove-player") {
+        await this.handleRemovePlayerCommand(interaction);
       } else if (interaction.commandName === "clear-channel") {
         await this.handleClearChannelCommand(interaction);
       }
@@ -757,6 +781,63 @@ export class DiscordBot {
       await interaction.editReply({
         content:
           "❌ Failed to clear channel messages. Please check my permissions and try again.",
+      });
+    }
+  }
+
+  private async handleRemovePlayerCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    // Admin-only command
+    if (!this.isUserAdmin(interaction.user.id)) {
+      await interaction.reply({
+        content: "❌ This command is restricted to administrators.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      // Get the username parameter
+      const username = interaction.options.getString("username", true);
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Validate username format (basic validation)
+      if (!username.trim() || username.length > 50) {
+        await interaction.editReply({
+          content: "❌ Invalid username. Username must be 1-50 characters.",
+        });
+        return;
+      }
+
+      // Try to delete the player
+      const deleted = await this.storageService.deletePlayer(username.trim());
+
+      if (deleted) {
+        await interaction.editReply({
+          content: `✅ Successfully removed player "${username}" from the database.`,
+        });
+
+        this.logger.info(
+          `Player ${username} removed from database by ${interaction.user.tag}`
+        );
+      } else {
+        await interaction.editReply({
+          content: `❌ Player "${username}" was not found in the database.`,
+        });
+
+        this.logger.info(
+          `Attempted to remove non-existent player ${username} by ${interaction.user.tag}`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Failed to remove player from database", error);
+
+      await interaction.editReply({
+        content:
+          "❌ Failed to remove player from database. Please try again later.",
       });
     }
   }

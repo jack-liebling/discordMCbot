@@ -339,6 +339,41 @@ export class DatabaseService implements IStorageService {
   }
 
   /**
+   * Delete a player from the database completely
+   */
+  async deletePlayer(username: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      // First check if player exists
+      const checkResult = await client.query(
+        "SELECT username FROM players WHERE username = $1",
+        [username]
+      );
+
+      if (checkResult.rows.length === 0) {
+        this.logger.info(`Player ${username} not found in database`);
+        return false;
+      }
+
+      // Delete from players table (CASCADE should handle related records)
+      const deleteResult = await client.query(
+        "DELETE FROM players WHERE username = $1",
+        [username]
+      );
+
+      const deleted = (deleteResult.rowCount || 0) > 0;
+      if (deleted) {
+        this.logger.info(
+          `Successfully deleted player ${username} from database`
+        );
+      }
+      return deleted;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Log a player activity event
    */
   async logActivity(activity: ActivityEvent): Promise<void> {

@@ -134,6 +134,7 @@ export interface IStorageService {
   updatePlayer(username: string, playerData: Partial<Player>): Promise<void>;
   getAllPlayers(): Promise<Player[]>;
   resetAllPlayerDeaths(): Promise<number>;
+  deletePlayer(username: string): Promise<boolean>;
 
   // Activity logging
   logActivity(activity: ActivityEvent): Promise<void>;
