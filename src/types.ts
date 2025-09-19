@@ -101,7 +101,7 @@ export interface FtpConfig {
   timezone: string;
 }
 
-// Storage interface that both StorageService and HybridStorageService implement
+// Storage interface implemented by DatabaseService
 export interface IStorageService {
   // Player management
   getPlayer(username: string): Promise<Player | null>;

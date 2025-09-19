@@ -1,11 +1,17 @@
 // Database service for PostgreSQL connection and operations
 import { Pool, PoolClient } from "pg";
-import { Player, ConfigData, LogProcessingState } from "./types";
+import {
+  Player,
+  ConfigData,
+  LogProcessingState,
+  PlayersData,
+  IStorageService,
+} from "./types";
 import { Logger } from "./logger";
 
-export class DatabaseService {
-  private pool: Pool;
-  private logger = Logger.getInstance();
+export class DatabaseService implements IStorageService {
+  private readonly pool: Pool;
+  private readonly logger = Logger.getInstance();
   private static instance: DatabaseService;
 
   constructor(databaseUrl?: string) {
@@ -119,6 +125,158 @@ export class DatabaseService {
     `);
 
     this.logger.info("Database tables created/verified");
+  }
+
+  /**
+   * Get all players as PlayersData format
+   */
+  async loadPlayers(): Promise<PlayersData> {
+    const players = await this.getPlayers();
+    return {
+      version: "1.1.0",
+      lastUpdated: new Date().toISOString(),
+      players,
+    };
+  }
+
+  /**
+   * Save players data (compatible with PlayersData format)
+   */
+  async savePlayers(data: PlayersData): Promise<void> {
+    const players = Object.values(data.players);
+    for (const player of players) {
+      await this.savePlayer(player);
+    }
+  }
+
+  /**
+   * Get a specific player
+   */
+  async getPlayer(username: string): Promise<Player | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        "SELECT * FROM players WHERE username = $1",
+        [username]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        username: row.username,
+        totalDeaths: row.total_deaths,
+        lastDeathTimestamp: row.last_death_timestamp?.toISOString(),
+        firstSeen: row.first_seen.toISOString(),
+        lastUpdated: row.last_updated.toISOString(),
+        lastSeenTimestamp: row.last_seen_timestamp.toISOString(),
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update or create a player
+   */
+  async updatePlayer(
+    username: string,
+    playerData: Partial<Player>
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      // First check if player exists
+      const existingResult = await client.query(
+        "SELECT * FROM players WHERE username = $1",
+        [username]
+      );
+
+      if (existingResult.rows.length === 0) {
+        // Create new player
+        const now = new Date().toISOString();
+        const newPlayer: Player = {
+          username,
+          totalDeaths: 0,
+          lastDeathTimestamp: null,
+          firstSeen: now,
+          lastUpdated: now,
+          lastSeenTimestamp: now,
+          ...playerData,
+        };
+        await this.savePlayer(newPlayer);
+      } else {
+        // Update existing player
+        const existingPlayer = {
+          username: existingResult.rows[0].username,
+          totalDeaths: existingResult.rows[0].total_deaths,
+          lastDeathTimestamp:
+            existingResult.rows[0].last_death_timestamp?.toISOString(),
+          firstSeen: existingResult.rows[0].first_seen.toISOString(),
+          lastUpdated: existingResult.rows[0].last_updated.toISOString(),
+          lastSeenTimestamp:
+            existingResult.rows[0].last_seen_timestamp.toISOString(),
+        };
+
+        const updatedPlayer = {
+          ...existingPlayer,
+          ...playerData,
+          lastUpdated: new Date().toISOString(),
+        };
+
+        await this.savePlayer(updatedPlayer);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Load configuration (compatible with existing interface)
+   */
+  async loadConfig(): Promise<ConfigData | null> {
+    return await this.getConfig();
+  }
+
+  /**
+   * Initialize configuration with defaults
+   */
+  async initializeConfig(): Promise<void> {
+    try {
+      let config = await this.loadConfig();
+
+      // Create default config if it doesn't exist
+      if (!config) {
+        config = {
+          discord: { channelId: "", guildId: "", enabled: true },
+          leaderboard: {
+            enabled: true,
+            announcementTime: "09:00", // 9:00 AM
+            timezone: "EST",
+            lastAnnouncementDate: "1970-01-01", // Default to epoch date
+          },
+        };
+
+        this.logger.info("Initialized default configuration");
+        await this.saveConfig(config);
+      }
+
+      // Initialize leaderboard config with defaults if missing
+      if (!config.leaderboard) {
+        config.leaderboard = {
+          enabled: true,
+          announcementTime: "09:00", // 9:00 AM
+          timezone: "EST",
+          lastAnnouncementDate: "1970-01-01", // Default to epoch date
+        };
+
+        this.logger.info("Initialized default leaderboard configuration");
+        await this.saveConfig(config);
+      }
+    } catch (error) {
+      this.logger.error("Failed to initialize configuration:", error);
+    }
   }
 
   /**

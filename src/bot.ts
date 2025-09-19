@@ -9,7 +9,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { ConfigLoader } from "./config";
-import { HybridStorageService } from "./hybridStorage";
+import { DatabaseService } from "./database";
 import { DiscordFormatter } from "./discord";
 import { PlayerTracker } from "./playerTracker";
 import { AnnouncementService } from "./announcer";
@@ -24,7 +24,7 @@ export class DiscordBot {
   private readonly configLoader = ConfigLoader.getInstance();
 
   // Services
-  private storageService!: HybridStorageService;
+  private storageService!: DatabaseService;
   private formatter!: DiscordFormatter;
   private playerTracker!: PlayerTracker;
   private announcementService!: AnnouncementService;
@@ -101,8 +101,8 @@ export class DiscordBot {
     try {
       this.logger.info("Initializing bot services...");
 
-      // Initialize hybrid storage service (database + JSON fallback)
-      this.storageService = new HybridStorageService();
+      // Initialize database storage service
+      this.storageService = DatabaseService.getInstance();
       await this.storageService.initialize();
 
       // Initialize configuration with defaults
