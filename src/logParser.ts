@@ -14,6 +14,8 @@ export class LogParserService {
   private onJoinCallback: ((username: string) => void) | null = null;
   private onLeaveCallback: ((username: string) => void) | null = null;
   private recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
+  private recentJoinEvents: Set<string> = new Set(); // Cache to prevent duplicate JOIN processing
+  private recentLeaveEvents: Set<string> = new Set(); // Cache to prevent duplicate LEAVE processing
 
   constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
@@ -158,6 +160,10 @@ export class LogParserService {
   }
 
   private parseLogLines(lines: string[]): void {
+    this.logger.debug(
+      `Processing ${lines.length} new lines. Cache sizes: JOIN=${this.recentJoinEvents.size}, LEAVE=${this.recentLeaveEvents.size}, DEATH=${this.recentDeathEvents.size}`
+    );
+
     for (const line of lines) {
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
@@ -303,10 +309,18 @@ export class LogParserService {
   }
 
   private parseLeaveMessage(logLine: string): string | null {
-    // Leave message format: [16:37:04] [Server thread/INFO]: MaroonFranc left the game
-    const leavePattern = /\[Server thread\/INFO\]:\s*(\w+)\s+left the game/;
-    const match = leavePattern.exec(logLine);
+    // Leave message formats:
+    // [16:37:04] [Server thread/INFO]: MaroonFranc left the game
+    // [19:53:23] [Server thread/INFO]: JackL64 lost connection: Disconnected
+    const leavePattern1 = /\[Server thread\/INFO\]:\s*(\w+)\s+left the game/;
+    const leavePattern2 = /\[Server thread\/INFO\]:\s*(\w+)\s+lost connection:/;
 
+    let match = leavePattern1.exec(logLine);
+    if (match) {
+      return match[1]; // Return the username
+    }
+
+    match = leavePattern2.exec(logLine);
     if (match) {
       return match[1]; // Return the username
     }

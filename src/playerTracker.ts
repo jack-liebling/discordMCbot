@@ -117,6 +117,27 @@ export class PlayerTracker {
     try {
       const now = new Date();
 
+      // Check for recent join events to prevent duplicates
+      this.logger.info(`🔍 Checking for recent JOIN events for ${username}...`);
+      const recentJoin = await this.storageService.getRecentActivity(
+        username,
+        "JOIN",
+        30
+      ); // 30 seconds
+      if (recentJoin) {
+        const secondsAgo = Math.round(
+          (now.getTime() - recentJoin.timestamp.getTime()) / 1000
+        );
+        this.logger.info(
+          `🔴 SKIPPING duplicate join for ${username} - last join was ${secondsAgo}s ago at ${recentJoin.timestamp.toISOString()}`
+        );
+        return;
+      }
+
+      this.logger.info(
+        `✅ No recent JOIN found for ${username}, proceeding to record...`
+      );
+
       // Ensure player exists
       await this.createOrUpdatePlayer(username);
 
@@ -142,6 +163,29 @@ export class PlayerTracker {
   async recordLeave(username: string): Promise<void> {
     try {
       const now = new Date();
+
+      // Check for recent leave events to prevent duplicates
+      this.logger.info(
+        `🔍 Checking for recent LEAVE events for ${username}...`
+      );
+      const recentLeave = await this.storageService.getRecentActivity(
+        username,
+        "LEAVE",
+        30
+      ); // 30 seconds
+      if (recentLeave) {
+        const secondsAgo = Math.round(
+          (now.getTime() - recentLeave.timestamp.getTime()) / 1000
+        );
+        this.logger.info(
+          `🔴 SKIPPING duplicate leave for ${username} - last leave was ${secondsAgo}s ago at ${recentLeave.timestamp.toISOString()}`
+        );
+        return;
+      }
+
+      this.logger.info(
+        `✅ No recent LEAVE found for ${username}, proceeding to record...`
+      );
 
       // Ensure player exists
       await this.createOrUpdatePlayer(username);

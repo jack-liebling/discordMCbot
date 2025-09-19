@@ -281,6 +281,42 @@ export class DatabaseService implements IStorageService {
     }
   }
 
+  async getRecentActivity(
+    username: string,
+    eventType: ActivityEventType,
+    withinSeconds: number
+  ): Promise<ActivityEvent | null> {
+    const client = await this.pool.connect();
+    try {
+      const query = `
+        SELECT * FROM activity_log 
+        WHERE username = $1 
+        AND event_type = $2 
+        AND timestamp >= NOW() - INTERVAL '${withinSeconds} seconds'
+        ORDER BY timestamp DESC 
+        LIMIT 1
+      `;
+
+      const result = await client.query(query, [username, eventType]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        username: row.username,
+        eventType: row.event_type as ActivityEventType,
+        timestamp: row.timestamp,
+        details: row.details,
+        createdAt: row.created_at,
+      };
+    } finally {
+      client.release();
+    }
+  }
+
   /**
    * Get today's death events for leaderboard
    */

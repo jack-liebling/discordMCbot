@@ -117,6 +117,11 @@ export interface IStorageService {
     username: string,
     eventType?: ActivityEventType
   ): Promise<ActivityEvent[]>;
+  getRecentActivity(
+    username: string,
+    eventType: ActivityEventType,
+    withinSeconds: number
+  ): Promise<ActivityEvent | null>;
   getDeathsToday(): Promise<ActivityEvent[]>;
 
   // Configuration management
