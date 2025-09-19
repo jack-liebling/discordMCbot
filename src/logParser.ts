@@ -168,13 +168,26 @@ export class LogParserService {
     );
 
     for (const line of lines) {
+      // Log each line being processed for death detection
+      this.logger.debug(`🔍 Analyzing log line: "${line}"`);
+
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
         // Create a unique key for this death event to prevent duplicates
-        const deathKey = `${deathEvent.username}-${deathEvent.cause}`;
+        // Include timestamp to allow multiple deaths with same cause
+        const deathKey = `${deathEvent.username}-${
+          deathEvent.cause
+        }-${deathEvent.timestamp.getTime()}`;
+
+        this.logger.debug(`💀 Death event detected - Key: ${deathKey}`);
+        this.logger.debug(
+          `💀 Death details: Player="${deathEvent.username}", Cause="${
+            deathEvent.cause
+          }", Timestamp="${deathEvent.timestamp.toISOString()}"`
+        );
 
         if (this.recentDeathEvents.has(deathKey)) {
-          this.logger.debug(`Skipping duplicate death event: ${deathKey}`);
+          this.logger.debug(`🔄 Skipping duplicate death event: ${deathKey}`);
           continue;
         }
 
@@ -183,13 +196,19 @@ export class LogParserService {
         if (this.recentDeathEvents.size > 100) {
           const keys = Array.from(this.recentDeathEvents);
           this.recentDeathEvents.delete(keys[0]);
+          this.logger.debug(`🧹 Cleaned oldest death cache entry: ${keys[0]}`);
         }
 
         this.logger.debug(
-          `Parsed death from log: ${deathEvent.username} - ${
+          `✅ Processing death event: ${deathEvent.username} - ${
             deathEvent.cause
           } at ${deathEvent.timestamp.toISOString()}`
         );
+
+        this.logger.info(
+          `💀 DEATH: ${deathEvent.username} ${deathEvent.cause} [Cache size: ${this.recentDeathEvents.size}]`
+        );
+
         this.onDeathCallback!(deathEvent);
       } else {
         const joinEvent = this.parseJoinMessage(line);
@@ -225,8 +244,13 @@ export class LogParserService {
     const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
     const timestampMatch = timestampPattern.exec(logLine);
     if (!timestampMatch) {
+      this.logger.debug(`⏰ No timestamp found in line: "${logLine}"`);
       return null;
     }
+
+    this.logger.debug(
+      `⏰ Timestamp found: ${timestampMatch[1]} in line: "${logLine}"`
+    );
 
     // Use current time when processing the log entry
     // This represents when the server actually wrote this log entry
@@ -267,9 +291,20 @@ export class LogParserService {
       /(\w+) died/,
     ];
 
-    for (const pattern of deathPatterns) {
+    this.logger.debug(
+      `🔎 Testing ${deathPatterns.length} death patterns against: "${logLine}"`
+    );
+
+    for (let i = 0; i < deathPatterns.length; i++) {
+      const pattern = deathPatterns[i];
       const match = pattern.exec(logLine);
       if (match) {
+        this.logger.debug(
+          `✅ Pattern ${i + 1} matched: ${pattern.source} -> Player: "${
+            match[1]
+          }"`
+        );
+
         const playerId = match[1];
         let cause = match[0].substring(playerId.length + 1); // Remove player name and space
 
@@ -285,6 +320,10 @@ export class LogParserService {
           cause = cause || "died of mysterious causes";
         }
 
+        this.logger.debug(
+          `💀 Parsed death: Player="${playerId}", Cause="${cause}", Original="${match[0]}"`
+        );
+
         return {
           username: playerId,
           timestamp,
@@ -293,6 +332,7 @@ export class LogParserService {
       }
     }
 
+    this.logger.debug(`❌ No death patterns matched for line: "${logLine}"`);
     return null;
   }
 

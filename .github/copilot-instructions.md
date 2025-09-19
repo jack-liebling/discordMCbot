@@ -40,7 +40,7 @@ Discord bot application that monitors Minecraft server deaths via FTP log parsin
 - All Discord timestamps display in New York time (EST/EDT) using TimezoneUtils
 - Database stores all timestamps as UTC for consistency
 - FTP log parsing every 10 seconds for accurate death detection with real causes
-- Rate limit: ignore deaths <30 seconds apart from same player
+- Rate limit: ignore deaths <10 seconds apart from same player
 - Comprehensive death message parsing with regex patterns
 - Environment variables for all secrets (tokens, passwords, FTP credentials, DATABASE_URL)
 - Auto-reconnection logic for FTP connections
