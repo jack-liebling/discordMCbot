@@ -41,7 +41,8 @@ export class ConfigLoader {
       CRAFTERS_ROLE_ID: process.env.CRAFTERS_ROLE_ID,
       WHO_IS_ON_CHANNEL_ID: process.env.WHO_IS_ON_CHANNEL_ID,
       ADMIN_USER_IDS: process.env.ADMIN_USER_IDS,
-      SKIP_OLD_EVENTS_ON_STARTUP: process.env.SKIP_OLD_EVENTS_ON_STARTUP,
+      SKIP_OLD_EVENTS_ON_STARTUP:
+        process.env.SKIP_OLD_EVENTS_ON_STARTUP || "true",
       SERVER_NAME: process.env.SERVER_NAME || "Minecraft Server",
       FTP_HOST: process.env.FTP_HOST,
       FTP_PORT: process.env.FTP_PORT || "21",
