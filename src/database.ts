@@ -716,6 +716,21 @@ export class DatabaseService implements IStorageService {
   }
 
   /**
+   * Clear all join messages from the database
+   */
+  async clearAllJoinMessages(): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query("DELETE FROM join_messages");
+      const deletedCount = result.rowCount || 0;
+      this.logger.info(`Cleared ${deletedCount} join messages from database`);
+      return deletedCount;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Mark a join message as pending deletion
    */
   async markJoinMessageForDeletion(

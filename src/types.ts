@@ -161,6 +161,7 @@ export interface IStorageService {
   saveJoinMessage(joinMessage: JoinMessage): Promise<void>;
   getJoinMessage(username: string): Promise<JoinMessage | null>;
   deleteJoinMessage(username: string): Promise<void>;
+  clearAllJoinMessages(): Promise<number>;
   markJoinMessageForDeletion(
     username: string,
     leaveTimestamp: Date
