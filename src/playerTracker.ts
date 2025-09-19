@@ -220,8 +220,8 @@ export class PlayerTracker {
         lastDeathTimestamp: deathEvent.timestamp.toISOString(),
       });
 
-      // Also use legacy storage method for backward compatibility
-      await this.storageService.storeDeath(deathEvent);
+      // Note: Death is already stored as activity via recordActivity() above
+      // No need to call storageService.storeDeath() which would duplicate logging
 
       return {
         recorded: true,

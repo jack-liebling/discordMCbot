@@ -241,6 +241,14 @@ export class LogParserService {
     )) {
       if (activityType === "DEATH") continue; // Deaths handled separately
 
+      // Skip JOIN/LEAVE if session callback is registered (they're handled separately)
+      if (
+        (activityType === "JOIN" || activityType === "LEAVE") &&
+        this.onSessionEventCallback
+      ) {
+        continue;
+      }
+
       const match = pattern.exec(logLine);
       if (match) {
         activities.push({
