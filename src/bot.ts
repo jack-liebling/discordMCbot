@@ -412,6 +412,11 @@ export class DiscordBot {
               .setMaxValue(100)
               .setRequired(false)
           ),
+        new SlashCommandBuilder()
+          .setName("clear-join-messages")
+          .setDescription(
+            "Clear all join message records from the database (admin only)"
+          ),
       ];
 
       const discordConfig = this.configLoader.getDiscordConfig();
@@ -506,6 +511,11 @@ export class DiscordBot {
                 .setMaxValue(100)
                 .setRequired(false)
             ),
+          new SlashCommandBuilder()
+            .setName("clear-join-messages")
+            .setDescription(
+              "Clear all join message records from the database (admin only)"
+            ),
         ];
 
         await rest.put(Routes.applicationCommands(this.client.user!.id), {
@@ -540,6 +550,8 @@ export class DiscordBot {
         await this.handleRemovePlayerCommand(interaction);
       } else if (interaction.commandName === "clear-channel") {
         await this.handleClearChannelCommand(interaction);
+      } else if (interaction.commandName === "clear-join-messages") {
+        await this.handleClearJoinMessagesCommand(interaction);
       }
     } catch (error) {
       this.logger.error(
@@ -838,6 +850,51 @@ export class DiscordBot {
       await interaction.editReply({
         content:
           "❌ Failed to remove player from database. Please try again later.",
+      });
+    }
+  }
+
+  private async handleClearJoinMessagesCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    // Admin-only command
+    if (!this.isUserAdmin(interaction.user.id)) {
+      await interaction.reply({
+        content: "❌ This command is restricted to administrators.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Clear all join messages from the database
+      const deletedCount = await this.storageService.clearAllJoinMessages();
+
+      if (deletedCount > 0) {
+        await interaction.editReply({
+          content: `✅ Successfully cleared ${deletedCount} join message records from the database.`,
+        });
+
+        this.logger.info(
+          `Cleared ${deletedCount} join messages from database by ${interaction.user.tag}`
+        );
+      } else {
+        await interaction.editReply({
+          content: "✅ The join messages table was already empty.",
+        });
+
+        this.logger.info(
+          `Join messages table already empty - cleared by ${interaction.user.tag}`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Failed to clear join messages from database", error);
+
+      await interaction.editReply({
+        content: "❌ Failed to clear join messages. Please try again later.",
       });
     }
   }
