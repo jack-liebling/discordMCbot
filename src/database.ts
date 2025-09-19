@@ -97,7 +97,9 @@ export class DatabaseService implements IStorageService {
         username VARCHAR(255) NOT NULL UNIQUE,
         message_id VARCHAR(255) NOT NULL,
         channel_id VARCHAR(255) NOT NULL,
-        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        pending_deletion BOOLEAN DEFAULT FALSE,
+        leave_timestamp TIMESTAMPTZ
       )
     `);
 
@@ -117,6 +119,41 @@ export class DatabaseService implements IStorageService {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log (timestamp DESC);
     `);
+
+    // Migration: Add new columns to existing join_messages table if they don't exist
+    try {
+      // Check if columns exist first
+      const result = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'join_messages' 
+        AND column_name IN ('pending_deletion', 'leave_timestamp')
+      `);
+
+      const existingColumns = result.rows.map((row) => row.column_name);
+
+      if (!existingColumns.includes("pending_deletion")) {
+        await client.query(
+          `ALTER TABLE join_messages ADD COLUMN pending_deletion BOOLEAN DEFAULT FALSE`
+        );
+        this.logger.debug(
+          "Added pending_deletion column to join_messages table"
+        );
+      }
+
+      if (!existingColumns.includes("leave_timestamp")) {
+        await client.query(
+          `ALTER TABLE join_messages ADD COLUMN leave_timestamp TIMESTAMPTZ`
+        );
+        this.logger.debug(
+          "Added leave_timestamp column to join_messages table"
+        );
+      }
+
+      this.logger.debug("Join messages table migration completed");
+    } catch (error) {
+      this.logger.error("Join messages table migration failed", error);
+      throw error;
+    }
 
     this.logger.info("Database tables created/verified");
   }
@@ -496,12 +533,14 @@ export class DatabaseService implements IStorageService {
   async saveJoinMessage(joinMessage: JoinMessage): Promise<void> {
     try {
       const query = `
-        INSERT INTO join_messages (username, message_id, channel_id, timestamp)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO join_messages (username, message_id, channel_id, timestamp, pending_deletion, leave_timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (username) DO UPDATE SET
           message_id = EXCLUDED.message_id,
           channel_id = EXCLUDED.channel_id,
-          timestamp = EXCLUDED.timestamp
+          timestamp = EXCLUDED.timestamp,
+          pending_deletion = EXCLUDED.pending_deletion,
+          leave_timestamp = EXCLUDED.leave_timestamp
       `;
 
       await this.pool.query(query, [
@@ -509,6 +548,8 @@ export class DatabaseService implements IStorageService {
         joinMessage.messageId,
         joinMessage.channelId,
         joinMessage.timestamp,
+        joinMessage.pendingDeletion || false,
+        joinMessage.leaveTimestamp || null,
       ]);
 
       this.logger.debug(
@@ -529,7 +570,7 @@ export class DatabaseService implements IStorageService {
   async getJoinMessage(playerName: string): Promise<JoinMessage | null> {
     try {
       const query = `
-        SELECT username, message_id, channel_id, timestamp
+        SELECT username, message_id, channel_id, timestamp, pending_deletion, leave_timestamp
         FROM join_messages
         WHERE username = $1
       `;
@@ -546,6 +587,8 @@ export class DatabaseService implements IStorageService {
         messageId: row.message_id,
         channelId: row.channel_id,
         timestamp: row.timestamp,
+        pendingDeletion: row.pending_deletion,
+        leaveTimestamp: row.leave_timestamp,
       };
     } catch (error) {
       this.logger.error(`Failed to get join message for ${playerName}:`, error);
@@ -564,6 +607,51 @@ export class DatabaseService implements IStorageService {
     } catch (error) {
       this.logger.error(
         `Failed to delete join message for ${playerName}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a join message as pending deletion
+   */
+  async markJoinMessageForDeletion(
+    playerName: string,
+    leaveTimestamp: Date
+  ): Promise<void> {
+    try {
+      const query = `
+        UPDATE join_messages 
+        SET pending_deletion = TRUE, leave_timestamp = $2
+        WHERE username = $1
+      `;
+      await this.pool.query(query, [playerName, leaveTimestamp]);
+      this.logger.debug(`Marked join message for deletion: ${playerName}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to mark join message for deletion for ${playerName}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel pending deletion for a join message (when player rejoins)
+   */
+  async cancelJoinMessageDeletion(playerName: string): Promise<void> {
+    try {
+      const query = `
+        UPDATE join_messages 
+        SET pending_deletion = FALSE, leave_timestamp = NULL
+        WHERE username = $1
+      `;
+      await this.pool.query(query, [playerName]);
+      this.logger.debug(`Cancelled join message deletion: ${playerName}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to cancel join message deletion for ${playerName}:`,
         error
       );
       throw error;

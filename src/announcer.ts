@@ -1,7 +1,12 @@
 // T015: Discord announcement service sending formatted messages to channels
 import { Client, TextChannel } from "discord.js";
 import { DiscordFormatter } from "./discord";
-import { DeathEvent, DailyLeaderboard, JoinMessage } from "./types";
+import {
+  DeathEvent,
+  DailyLeaderboard,
+  JoinMessage,
+  PendingDeletion,
+} from "./types";
 import { LeaderboardFormatter } from "./leaderboardFormatter";
 import { Logger } from "./logger";
 
@@ -17,6 +22,7 @@ export class AnnouncementService {
   private isReady = false;
   private messageQueue: Array<() => Promise<void>> = [];
   private processingQueue = false;
+  private readonly pendingDeletions: Map<string, PendingDeletion> = new Map();
 
   constructor(
     client: Client,
@@ -313,7 +319,21 @@ export class AnnouncementService {
     this.messageQueue = [];
     this.processingQueue = false;
 
+    // Clear all pending deletions
+    this.clearAllPendingDeletions();
+
     this.logger.info("Announcement service reset");
+  }
+
+  /**
+   * Clear all pending deletions (useful for shutdown)
+   */
+  private clearAllPendingDeletions(): void {
+    for (const [username, pendingDeletion] of this.pendingDeletions.entries()) {
+      clearTimeout(pendingDeletion.timeoutId);
+      this.logger.debug(`Cleared pending deletion timeout for ${username}`);
+    }
+    this.pendingDeletions.clear();
   }
 
   // Create a leaderboard embed for manual commands
@@ -426,6 +446,88 @@ export class AnnouncementService {
         { messageId: joinMessage.messageId, error }
       );
       return false;
+    }
+  }
+
+  /**
+   * Schedule delayed deletion of a join message (1 minute delay)
+   */
+  async scheduleJoinMessageDeletion(
+    username: string,
+    joinMessage: JoinMessage,
+    storageService: any
+  ): Promise<void> {
+    const leaveTimestamp = new Date();
+
+    // Cancel any existing pending deletion for this user
+    this.cancelPendingDeletion(username);
+
+    // Mark the message as pending deletion in the database
+    await storageService.markJoinMessageForDeletion(username, leaveTimestamp);
+
+    // Schedule deletion after 1 minute (60,000 ms)
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Remove from pending deletions map
+        this.pendingDeletions.delete(username);
+
+        // Get the latest join message (in case it changed)
+        const currentJoinMessage = await storageService.getJoinMessage(
+          username
+        );
+        if (currentJoinMessage?.pendingDeletion) {
+          // Proceed with deletion
+          const deleted = await this.deleteJoinAnnouncement(currentJoinMessage);
+          if (deleted) {
+            await storageService.deleteJoinMessage(username);
+            this.logger.info(`Delayed deletion completed for ${username}`);
+          } else {
+            this.logger.warn(`Failed delayed deletion for ${username}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error during delayed deletion for ${username}`,
+          error
+        );
+      }
+    }, 60000); // 1 minute delay
+
+    // Store the pending deletion
+    this.pendingDeletions.set(username, {
+      username,
+      leaveTimestamp,
+      timeoutId,
+    });
+
+    this.logger.info(`Scheduled delayed deletion for ${username} in 1 minute`);
+  }
+
+  /**
+   * Cancel pending deletion when user rejoins
+   */
+  async cancelJoinMessageDeletion(
+    username: string,
+    storageService: any
+  ): Promise<void> {
+    // Cancel the timeout if it exists
+    this.cancelPendingDeletion(username);
+
+    // Update database to cancel pending deletion
+    await storageService.cancelJoinMessageDeletion(username);
+
+    this.logger.info(`Cancelled pending deletion for ${username}`);
+  }
+
+  /**
+   * Internal method to cancel a pending deletion timeout
+   */
+  private cancelPendingDeletion(username: string): void {
+    const pendingDeletion = this.pendingDeletions.get(username);
+    if (pendingDeletion) {
+      clearTimeout(pendingDeletion.timeoutId);
+      this.pendingDeletions.delete(username);
+      this.logger.debug(`Cleared pending deletion timeout for ${username}`);
     }
   }
 

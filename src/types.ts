@@ -57,6 +57,15 @@ export interface JoinMessage {
   messageId: string;
   channelId: string;
   timestamp: Date;
+  pendingDeletion?: boolean;
+  leaveTimestamp?: Date;
+}
+
+// Pending deletion tracking for delayed message removal
+export interface PendingDeletion {
+  username: string;
+  leaveTimestamp: Date;
+  timeoutId: NodeJS.Timeout;
 }
 
 // Discord configuration
@@ -147,6 +156,11 @@ export interface IStorageService {
   saveJoinMessage(joinMessage: JoinMessage): Promise<void>;
   getJoinMessage(username: string): Promise<JoinMessage | null>;
   deleteJoinMessage(username: string): Promise<void>;
+  markJoinMessageForDeletion(
+    username: string,
+    leaveTimestamp: Date
+  ): Promise<void>;
+  cancelJoinMessageDeletion(username: string): Promise<void>;
 
   // Initialize with defaults
   initializeConfig(): Promise<void>;

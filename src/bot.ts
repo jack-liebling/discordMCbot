@@ -167,6 +167,20 @@ export class DiscordBot {
           // Handle join announcement with @crafters role mention
           const joinLeaveConfig = this.configLoader.getJoinLeaveConfig();
           if (joinLeaveConfig) {
+            // Check if user has a pending deletion - if so, cancel it
+            const existingJoinMessage =
+              await this.storageService.getJoinMessage(username);
+            if (existingJoinMessage?.pendingDeletion) {
+              await this.announcementService.cancelJoinMessageDeletion(
+                username,
+                this.storageService
+              );
+              this.logger.info(
+                `Cancelled pending deletion for returning player ${username}`
+              );
+              return; // Keep existing join message, don't create new one
+            }
+
             const joinMessage =
               await this.announcementService.announcePlayerJoin(
                 username,
@@ -186,21 +200,21 @@ export class DiscordBot {
           await this.playerTracker.recordLeave(username, timestamp);
           this.logger.info(`Player left: ${username}`);
 
-          // Handle leave announcement by deleting the join message
+          // Handle leave announcement with delayed deletion (1 minute)
           const joinMessage = await this.storageService.getJoinMessage(
             username
           );
-          if (joinMessage) {
-            const deleted =
-              await this.announcementService.deleteJoinAnnouncement(
-                joinMessage
-              );
-            if (deleted) {
-              await this.storageService.deleteJoinMessage(username);
-              this.logger.info(`Deleted join message for ${username}`);
-            } else {
-              this.logger.warn(`Failed to delete join message for ${username}`);
-            }
+          if (joinMessage && !joinMessage.pendingDeletion) {
+            // Schedule delayed deletion instead of immediate deletion
+            await this.announcementService.scheduleJoinMessageDeletion(
+              username,
+              joinMessage,
+              this.storageService
+            );
+          } else if (joinMessage?.pendingDeletion) {
+            this.logger.debug(
+              `Join message for ${username} already pending deletion`
+            );
           } else {
             this.logger.debug(
               `No join message found for ${username} to delete`
