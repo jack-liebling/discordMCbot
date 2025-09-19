@@ -174,7 +174,7 @@ export class LeaderboardFormatter {
     if (deathCount >= 10) return "🔥"; // Fire for many deaths
     if (deathCount >= 7) return "🤕"; // Bandaged face for getting hurt often
     if (deathCount >= 5) return "😵"; // Dizzy face for moderate deaths
-    if (deathCount >= 3) return "�"; // Grimacing face for some deaths
+    if (deathCount >= 3) return "😬"; // Grimacing face for some deaths
     if (deathCount >= 1) return "👶"; // Baby for first deaths (everyone starts somewhere)
     return "😇"; // Angel for the pure soul with no deaths
   }
