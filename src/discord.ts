@@ -107,11 +107,10 @@ export class DiscordFormatter {
       .setColor(0x00ff00 as ColorResolvable) // Green color
       .addFields({
         name: "Join Time",
-        value: this.formatTimestamp(sessionEvent.timestamp),
+        value: this.formatTimestamp(edtTimestamp),
         inline: true,
       })
-      .setFooter({ text: `${this.serverName} • Welcome!` })
-      .setTimestamp(edtTimestamp); // Use EDT timestamp for Discord's timestamp display
+      .setFooter({ text: `${this.serverName} • Welcome!` });
 
     this.logger.debug("Created session join embed", {
       username: sessionEvent.username,
