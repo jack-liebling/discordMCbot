@@ -13,6 +13,7 @@ export class LogParserService {
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
   private onJoinCallback: ((username: string) => void) | null = null;
   private onLeaveCallback: ((username: string) => void) | null = null;
+  private recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
 
   constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
@@ -160,6 +161,23 @@ export class LogParserService {
     for (const line of lines) {
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
+        // Create a unique key for this death event to prevent duplicates
+        const deathKey = `${
+          deathEvent.username
+        }-${deathEvent.timestamp.getTime()}-${deathEvent.cause}`;
+
+        if (this.recentDeathEvents.has(deathKey)) {
+          this.logger.debug(`Skipping duplicate death event: ${deathKey}`);
+          continue;
+        }
+
+        // Add to cache and clean old entries (keep last 100 events)
+        this.recentDeathEvents.add(deathKey);
+        if (this.recentDeathEvents.size > 100) {
+          const keys = Array.from(this.recentDeathEvents);
+          this.recentDeathEvents.delete(keys[0]);
+        }
+
         this.logger.debug(
           `Parsed death from log: ${deathEvent.username} - ${deathEvent.cause}`
         );

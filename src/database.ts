@@ -173,13 +173,13 @@ export class DatabaseService implements IStorageService {
         INSERT INTO players (username, total_deaths, last_join, last_leave)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (username) DO UPDATE SET
-          total_deaths = COALESCE(EXCLUDED.total_deaths, players.total_deaths),
-          last_join = COALESCE(EXCLUDED.last_join, players.last_join),
-          last_leave = COALESCE(EXCLUDED.last_leave, players.last_leave)
+          total_deaths = CASE WHEN $2 IS NOT NULL THEN $2 ELSE players.total_deaths END,
+          last_join = CASE WHEN $3 IS NOT NULL THEN $3 ELSE players.last_join END,
+          last_leave = CASE WHEN $4 IS NOT NULL THEN $4 ELSE players.last_leave END
       `,
         [
           username,
-          playerData.totalDeaths ?? 0,
+          playerData.totalDeaths ?? null,
           playerData.lastJoin ?? null,
           playerData.lastLeave ?? null,
         ]
