@@ -103,6 +103,8 @@ export interface EnvironmentConfig {
   DISCORD_GUILD_ID: string;
   CRAFTERS_ROLE_ID?: string;
   WHO_IS_ON_CHANNEL_ID?: string;
+  ADMIN_USER_IDS?: string; // Comma-separated list of Discord user IDs
+  SKIP_OLD_EVENTS_ON_STARTUP?: string; // "true" to skip old events on startup
   SERVER_NAME: string;
   FTP_HOST?: string;
   FTP_PORT?: string;
@@ -131,6 +133,8 @@ export interface IStorageService {
   getPlayer(username: string): Promise<Player | null>;
   updatePlayer(username: string, playerData: Partial<Player>): Promise<void>;
   getAllPlayers(): Promise<Player[]>;
+  resetAllPlayerDeaths(): Promise<number>;
+  deletePlayer(username: string): Promise<boolean>;
 
   // Activity logging
   logActivity(activity: ActivityEvent): Promise<void>;

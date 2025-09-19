@@ -241,62 +241,133 @@ export class DatabaseService implements IStorageService {
   ): Promise<void> {
     const client = await this.pool.connect();
     try {
-      // Check if player exists first
-      const existingPlayer = await client.query(
+      // Use UPSERT with ON CONFLICT to handle race conditions
+      // This ensures atomic insert-or-update without race conditions
+
+      const updateFields = [];
+      const values: any[] = [username];
+      let paramIndex = 2;
+
+      // Build the SET clause for updates
+      if (playerData.totalDeaths !== undefined) {
+        updateFields.push(`total_deaths = $${paramIndex}`);
+        values.push(playerData.totalDeaths);
+        paramIndex++;
+      }
+
+      if (playerData.onlineTimeMs !== undefined) {
+        updateFields.push(`online_time_ms = $${paramIndex}`);
+        values.push(playerData.onlineTimeMs);
+        paramIndex++;
+      }
+
+      if (playerData.lastJoin !== undefined) {
+        updateFields.push(`last_join = $${paramIndex}`);
+        values.push(playerData.lastJoin);
+        paramIndex++;
+      }
+
+      if (playerData.lastLeave !== undefined) {
+        updateFields.push(`last_leave = $${paramIndex}`);
+        values.push(playerData.lastLeave);
+        paramIndex++;
+      }
+
+      if (updateFields.length > 0) {
+        // UPSERT: Insert new player or update existing one atomically
+        const query = `
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, created_at)
+          VALUES ($1, $${paramIndex}, $${paramIndex + 1}, $${
+          paramIndex + 2
+        }, $${paramIndex + 3}, NOW())
+          ON CONFLICT (username) DO UPDATE SET
+            ${updateFields.join(", ")}
+        `;
+
+        values.push(
+          playerData.totalDeaths ?? 0,
+          playerData.onlineTimeMs ?? 0,
+          playerData.lastJoin ?? null,
+          playerData.lastLeave ?? null
+        );
+
+        await client.query(query, values);
+        this.logger.debug(
+          `Upserted player ${username} with updates: ${updateFields.join(", ")}`
+        );
+      } else {
+        // Just ensure player exists if no specific updates
+        const result = await client.query(
+          `
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, created_at)
+          VALUES ($1, 0, 0, NULL, NULL, NOW())
+          ON CONFLICT (username) DO NOTHING
+          RETURNING username
+        `,
+          [username]
+        );
+
+        if (result.rows.length > 0) {
+          this.logger.info(`Created new player record for ${username}`);
+        } else {
+          this.logger.debug(
+            `Player ${username} already exists, no update needed`
+          );
+        }
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Reset all player death counts to zero
+   */
+  async resetAllPlayerDeaths(): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        "UPDATE players SET total_deaths = 0 WHERE total_deaths > 0"
+      );
+
+      const resetCount = result.rowCount || 0;
+      this.logger.info(`Reset death counts for ${resetCount} players`);
+      return resetCount;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Delete a player from the database completely
+   */
+  async deletePlayer(username: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      // First check if player exists
+      const checkResult = await client.query(
         "SELECT username FROM players WHERE username = $1",
         [username]
       );
 
-      if (existingPlayer.rows.length > 0) {
-        // Player exists, do UPDATE only
-        const updateFields = [];
-        const updateValues: any[] = [username];
-        let paramIndex = 2;
+      if (checkResult.rows.length === 0) {
+        this.logger.info(`Player ${username} not found in database`);
+        return false;
+      }
 
-        if (playerData.totalDeaths !== undefined) {
-          updateFields.push(`total_deaths = $${paramIndex}`);
-          updateValues.push(playerData.totalDeaths);
-          paramIndex++;
-        }
+      // Delete from players table (CASCADE should handle related records)
+      const deleteResult = await client.query(
+        "DELETE FROM players WHERE username = $1",
+        [username]
+      );
 
-        if (playerData.onlineTimeMs !== undefined) {
-          updateFields.push(`online_time_ms = $${paramIndex}`);
-          updateValues.push(playerData.onlineTimeMs);
-          paramIndex++;
-        }
-
-        if (playerData.lastJoin !== undefined) {
-          updateFields.push(`last_join = $${paramIndex}`);
-          updateValues.push(playerData.lastJoin);
-          paramIndex++;
-        }
-
-        if (playerData.lastLeave !== undefined) {
-          updateFields.push(`last_leave = $${paramIndex}`);
-          updateValues.push(playerData.lastLeave);
-          paramIndex++;
-        }
-
-        if (updateFields.length > 0) {
-          await client.query(
-            `UPDATE players SET ${updateFields.join(", ")} WHERE username = $1`,
-            updateValues
-          );
-        }
-      } else {
-        // Player doesn't exist, do INSERT with defaults
-        await client.query(
-          `INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            username,
-            playerData.totalDeaths ?? 0,
-            playerData.onlineTimeMs ?? 0,
-            playerData.lastJoin ?? null,
-            playerData.lastLeave ?? null,
-          ]
+      const deleted = (deleteResult.rowCount || 0) > 0;
+      if (deleted) {
+        this.logger.info(
+          `Successfully deleted player ${username} from database`
         );
       }
+      return deleted;
     } finally {
       client.release();
     }

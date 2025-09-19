@@ -25,23 +25,14 @@ export class PlayerTracker {
 
   async createOrUpdatePlayer(username: string): Promise<Player> {
     try {
-      let player = await this.storageService.getPlayer(username);
+      // Use upsert to ensure player exists - this handles race conditions
+      await this.storageService.updatePlayer(username, {});
+
+      // Now get the player (guaranteed to exist)
+      const player = await this.storageService.getPlayer(username);
 
       if (!player) {
-        // Create new player
-        const now = new Date();
-        const newPlayer: Player = {
-          username,
-          totalDeaths: 0,
-          onlineTimeMs: 0,
-          lastJoin: null,
-          lastLeave: null,
-          createdAt: now,
-        };
-
-        await this.storageService.updatePlayer(username, newPlayer);
-        this.logger.info(`Created new player record for ${username}`);
-        return newPlayer;
+        throw new Error(`Failed to create/retrieve player ${username}`);
       }
 
       return player;

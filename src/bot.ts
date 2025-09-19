@@ -139,6 +139,11 @@ export class DiscordBot {
         this.storageService
       );
 
+      // Enable skip old events mode if configured
+      if (this.configLoader.shouldSkipOldEventsOnStartup()) {
+        this.logParserService.enableSkipOldEvents();
+      }
+
       await this.logParserService.connect();
       this.logger.info("Log parser service connected successfully");
 
@@ -378,6 +383,35 @@ export class DiscordBot {
           .setDescription(
             "Reset the daily announcement flag for testing (admin only)"
           ),
+        new SlashCommandBuilder()
+          .setName("reset-deaths")
+          .setDescription("Reset all player death counts to zero (admin only)"),
+        new SlashCommandBuilder()
+          .setName("remove-player")
+          .setDescription(
+            "Remove a player from the database completely (admin only)"
+          )
+          .addStringOption((option) =>
+            option
+              .setName("username")
+              .setDescription("Username of the player to remove")
+              .setRequired(true)
+          ),
+        new SlashCommandBuilder()
+          .setName("clear-channel")
+          .setDescription(
+            "Clear all messages from the current channel (admin only)"
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("amount")
+              .setDescription(
+                "Number of messages to delete (1-100, default: 50)"
+              )
+              .setMinValue(1)
+              .setMaxValue(100)
+              .setRequired(false)
+          ),
       ];
 
       const discordConfig = this.configLoader.getDiscordConfig();
@@ -441,6 +475,37 @@ export class DiscordBot {
             .setDescription(
               "Reset the daily announcement flag for testing (admin only)"
             ),
+          new SlashCommandBuilder()
+            .setName("reset-deaths")
+            .setDescription(
+              "Reset all player death counts to zero (admin only)"
+            ),
+          new SlashCommandBuilder()
+            .setName("remove-player")
+            .setDescription(
+              "Remove a player from the database completely (admin only)"
+            )
+            .addStringOption((option) =>
+              option
+                .setName("username")
+                .setDescription("Username of the player to remove")
+                .setRequired(true)
+            ),
+          new SlashCommandBuilder()
+            .setName("clear-channel")
+            .setDescription(
+              "Clear all messages from the current channel (admin only)"
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("amount")
+                .setDescription(
+                  "Number of messages to delete (1-100, default: 50)"
+                )
+                .setMinValue(1)
+                .setMaxValue(100)
+                .setRequired(false)
+            ),
         ];
 
         await rest.put(Routes.applicationCommands(this.client.user!.id), {
@@ -469,6 +534,12 @@ export class DiscordBot {
         await this.handleTestLeaderboardCommand(interaction);
       } else if (interaction.commandName === "reset-leaderboard") {
         await this.handleResetLeaderboardCommand(interaction);
+      } else if (interaction.commandName === "reset-deaths") {
+        await this.handleResetDeathsCommand(interaction);
+      } else if (interaction.commandName === "remove-player") {
+        await this.handleRemovePlayerCommand(interaction);
+      } else if (interaction.commandName === "clear-channel") {
+        await this.handleClearChannelCommand(interaction);
       }
     } catch (error) {
       this.logger.error(
@@ -483,6 +554,11 @@ export class DiscordBot {
         });
       }
     }
+  }
+
+  private isUserAdmin(userId: string): boolean {
+    const adminUserIds = this.configLoader.getAdminUserIds();
+    return adminUserIds.includes(userId);
   }
 
   private async handleLeaderboardCommand(
@@ -518,6 +594,15 @@ export class DiscordBot {
     interaction: ChatInputCommandInteraction
   ): Promise<void> {
     try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
       // Defer reply since this might take a moment
       await interaction.deferReply({ ephemeral: true });
 
@@ -549,6 +634,15 @@ export class DiscordBot {
     interaction: ChatInputCommandInteraction
   ): Promise<void> {
     try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
       // Defer reply since this might take a moment
       await interaction.deferReply({ ephemeral: true });
 
@@ -569,6 +663,181 @@ export class DiscordBot {
       await interaction.editReply({
         content:
           "❌ Failed to reset announcement flag. Please try again later.",
+      });
+    }
+  }
+
+  private async handleResetDeathsCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    try {
+      // Check admin permissions
+      if (!this.isUserAdmin(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ You do not have permission to use this command.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Reset all player death counts
+      const resetCount = await this.storageService.resetAllPlayerDeaths();
+
+      await interaction.editReply({
+        content:
+          resetCount > 0
+            ? `✅ Successfully reset death counts for ${resetCount} players.`
+            : "✅ All player death counts were already at zero.",
+      });
+
+      this.logger.info(
+        `Death counts reset by ${interaction.user.tag} - ${resetCount} players affected`
+      );
+    } catch (error) {
+      this.logger.error("Failed to reset player death counts", error);
+
+      await interaction.editReply({
+        content: "❌ Failed to reset death counts. Please try again later.",
+      });
+    }
+  }
+
+  private async handleClearChannelCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    // Admin-only command
+    if (!this.isUserAdmin(interaction.user.id)) {
+      await interaction.reply({
+        content: "❌ This command is restricted to administrators.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      // Get the amount parameter (default to 50 if not provided)
+      const amount = interaction.options.getInteger("amount") ?? 50;
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Check if we're in a text channel that supports bulk delete
+      if (!interaction.channel?.isTextBased()) {
+        await interaction.editReply({
+          content: "❌ This command can only be used in text channels.",
+        });
+        return;
+      }
+
+      // Check if this is a guild channel (not DM) which supports bulkDelete
+      if (!interaction.guild) {
+        await interaction.editReply({
+          content: "❌ This command can only be used in server channels.",
+        });
+        return;
+      }
+
+      // Fetch messages to delete
+      const messages = await interaction.channel.messages.fetch({
+        limit: amount,
+      });
+
+      // Filter out messages older than 14 days (Discord limitation)
+      const now = Date.now();
+      const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+      const deletableMessages = messages.filter(
+        (msg) => msg.createdTimestamp > twoWeeksAgo
+      );
+
+      if (deletableMessages.size === 0) {
+        await interaction.editReply({
+          content:
+            "❌ No messages found that can be deleted (messages must be less than 14 days old).",
+        });
+        return;
+      }
+
+      // Use bulkDelete for efficiency (max 100 messages)
+      // Cast to GuildTextBasedChannel since we've verified it's in a guild
+      const guildChannel = interaction.channel as any;
+      const deletedMessages = await guildChannel.bulkDelete(
+        deletableMessages,
+        true
+      );
+
+      await interaction.editReply({
+        content: `✅ Successfully deleted ${deletedMessages.size} messages from this channel.`,
+      });
+
+      this.logger.info(
+        `Channel cleared by ${interaction.user.tag} - ${deletedMessages.size} messages deleted from ${interaction.channel.id}`
+      );
+    } catch (error) {
+      this.logger.error("Failed to clear channel messages", error);
+
+      await interaction.editReply({
+        content:
+          "❌ Failed to clear channel messages. Please check my permissions and try again.",
+      });
+    }
+  }
+
+  private async handleRemovePlayerCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    // Admin-only command
+    if (!this.isUserAdmin(interaction.user.id)) {
+      await interaction.reply({
+        content: "❌ This command is restricted to administrators.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      // Get the username parameter
+      const username = interaction.options.getString("username", true);
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Validate username format (basic validation)
+      if (!username.trim() || username.length > 50) {
+        await interaction.editReply({
+          content: "❌ Invalid username. Username must be 1-50 characters.",
+        });
+        return;
+      }
+
+      // Try to delete the player
+      const deleted = await this.storageService.deletePlayer(username.trim());
+
+      if (deleted) {
+        await interaction.editReply({
+          content: `✅ Successfully removed player "${username}" from the database.`,
+        });
+
+        this.logger.info(
+          `Player ${username} removed from database by ${interaction.user.tag}`
+        );
+      } else {
+        await interaction.editReply({
+          content: `❌ Player "${username}" was not found in the database.`,
+        });
+
+        this.logger.info(
+          `Attempted to remove non-existent player ${username} by ${interaction.user.tag}`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Failed to remove player from database", error);
+
+      await interaction.editReply({
+        content:
+          "❌ Failed to remove player from database. Please try again later.",
       });
     }
   }

@@ -40,6 +40,9 @@ export class ConfigLoader {
       DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID!,
       CRAFTERS_ROLE_ID: process.env.CRAFTERS_ROLE_ID,
       WHO_IS_ON_CHANNEL_ID: process.env.WHO_IS_ON_CHANNEL_ID,
+      ADMIN_USER_IDS: process.env.ADMIN_USER_IDS,
+      SKIP_OLD_EVENTS_ON_STARTUP:
+        process.env.SKIP_OLD_EVENTS_ON_STARTUP || "true",
       SERVER_NAME: process.env.SERVER_NAME || "Minecraft Server",
       FTP_HOST: process.env.FTP_HOST,
       FTP_PORT: process.env.FTP_PORT || "21",
@@ -95,6 +98,19 @@ export class ConfigLoader {
       whoIsOnChannelId: this.config.WHO_IS_ON_CHANNEL_ID,
       guildId: this.config.DISCORD_GUILD_ID,
     };
+  }
+
+  public getAdminUserIds(): string[] {
+    if (!this.config.ADMIN_USER_IDS) {
+      return [];
+    }
+    return this.config.ADMIN_USER_IDS.split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+  }
+
+  public shouldSkipOldEventsOnStartup(): boolean {
+    return this.config.SKIP_OLD_EVENTS_ON_STARTUP?.toLowerCase() === "true";
   }
 
   public validateConfig(): { isValid: boolean; errors: string[] } {

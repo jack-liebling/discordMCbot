@@ -19,19 +19,25 @@ export class LogParserService {
   private recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
   private recentJoinEvents: Set<string> = new Set(); // Cache to prevent duplicate JOIN processing
   private recentLeaveEvents: Set<string> = new Set(); // Cache to prevent duplicate LEAVE processing
+  private readonly startupTime: Date;
+  private readonly skipOldEvents: boolean = false;
 
   constructor(ftpConfig: FtpConfig, storageService: IStorageService) {
     this.ftpConfig = ftpConfig;
     this.storageService = storageService;
+    this.startupTime = new Date();
+  }
+
+  enableSkipOldEvents(): void {
+    (this as any).skipOldEvents = true;
+    this.logger.info(
+      "Skip old events mode enabled - will only process new events after startup"
+    );
   }
 
   async connect(): Promise<void> {
     // Load saved log state to prevent re-processing old entries
     const logState = await this.storageService.getLogState();
-    this.lastLogPosition = logState?.lastProcessedPosition ?? 0;
-    this.logger.info(
-      `Starting log monitoring from position: ${this.lastLogPosition}`
-    );
 
     return new Promise((resolve, reject) => {
       this.ftpClient = new FtpClient();
@@ -39,7 +45,22 @@ export class LogParserService {
 
       client.on("ready", () => {
         this.logger.info(`FTP connected to ${this.ftpConfig.host}`);
-        resolve();
+
+        // Handle skip mode after FTP connection is established
+        this.handleSkipModeSetup(logState)
+          .then(() => resolve())
+          .catch((error) => {
+            this.logger.error(
+              "Failed to setup skip mode, falling back to normal mode",
+              error
+            );
+            // Fall back to normal mode to prevent processing entire log
+            this.lastLogPosition = logState?.lastProcessedPosition ?? 0;
+            this.logger.info(
+              `Fallback: Starting log monitoring from position: ${this.lastLogPosition}`
+            );
+            resolve();
+          });
       });
 
       client.on("error", (err: Error) => {
@@ -54,6 +75,31 @@ export class LogParserService {
         password: this.ftpConfig.password,
       });
     });
+  }
+
+  private async handleSkipModeSetup(logState: any): Promise<void> {
+    if (this.skipOldEvents) {
+      // Skip old events mode: jump to end of log file to only process new events
+      this.logger.info("Skip old events mode: jumping to end of log file");
+
+      this.lastLogPosition = await this.getLogFileSize();
+      this.logger.info(
+        `Starting log monitoring from end position: ${this.lastLogPosition}`
+      );
+
+      // Update the stored position so we don't re-process on next restart
+      await this.storageService.saveLogState({
+        lastProcessedPosition: this.lastLogPosition,
+        lastProcessedTimestamp: new Date().toISOString(),
+        lastUpdateTime: new Date().toISOString(),
+      });
+    } else {
+      // Normal mode: resume from last position
+      this.lastLogPosition = logState?.lastProcessedPosition ?? 0;
+      this.logger.info(
+        `Starting log monitoring from position: ${this.lastLogPosition}`
+      );
+    }
   }
 
   disconnect(): void {
@@ -117,7 +163,7 @@ export class LogParserService {
 
       this.ftpClient.get(this.ftpConfig.logPath, (err: any, stream: any) => {
         if (err) {
-          reject(err);
+          reject(new Error(`FTP download error: ${err.message || err}`));
           return;
         }
 
@@ -131,8 +177,52 @@ export class LogParserService {
         });
 
         stream.on("error", (error: any) => {
-          reject(error);
+          reject(new Error(`Stream error: ${error.message || error}`));
         });
+      });
+    });
+  }
+
+  private async getLogFileSize(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      if (!this.ftpClient) {
+        reject(new Error("FTP client not connected"));
+        return;
+      }
+
+      // Use FTP SIZE command to get file size without downloading
+      this.ftpClient.size(this.ftpConfig.logPath, (err: any, size: number) => {
+        if (err) {
+          this.logger.error(
+            "Failed to get file size via SIZE command, falling back to download method",
+            err
+          );
+          // Fallback to download method
+          this.downloadLogFile()
+            .then((content) => {
+              const size = content.length;
+              this.logger.info(
+                `Got log file size via download fallback: ${size} bytes`
+              );
+              resolve(size);
+            })
+            .catch((downloadErr) => {
+              this.logger.error(
+                "Both SIZE command and download fallback failed",
+                downloadErr
+              );
+              reject(
+                new Error(
+                  `Failed to get log file size: ${
+                    downloadErr.message || downloadErr
+                  }`
+                )
+              );
+            });
+        } else {
+          this.logger.info(`Got log file size via SIZE command: ${size} bytes`);
+          resolve(size);
+        }
       });
     });
   }
