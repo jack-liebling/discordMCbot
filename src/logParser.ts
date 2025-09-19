@@ -11,8 +11,11 @@ export class LogParserService {
   private lastLogPosition = 0;
   private intervalId: NodeJS.Timeout | null = null;
   private onDeathCallback: ((death: DeathEvent) => void) | null = null;
-  private onJoinCallback: ((username: string) => void) | null = null;
-  private onLeaveCallback: ((username: string) => void) | null = null;
+  private onJoinCallback: ((username: string, timestamp: Date) => void) | null =
+    null;
+  private onLeaveCallback:
+    | ((username: string, timestamp: Date) => void)
+    | null = null;
   private recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
   private recentJoinEvents: Set<string> = new Set(); // Cache to prevent duplicate JOIN processing
   private recentLeaveEvents: Set<string> = new Set(); // Cache to prevent duplicate LEAVE processing
@@ -67,8 +70,8 @@ export class LogParserService {
 
   startMonitoring(
     onDeath: (death: DeathEvent) => void,
-    onJoin?: (username: string) => void,
-    onLeave?: (username: string) => void
+    onJoin?: (username: string, timestamp: Date) => void,
+    onLeave?: (username: string, timestamp: Date) => void
   ): void {
     this.onDeathCallback = onDeath;
     this.onJoinCallback = onJoin || null;
@@ -168,9 +171,7 @@ export class LogParserService {
       const deathEvent = this.parseDeathMessage(line);
       if (deathEvent) {
         // Create a unique key for this death event to prevent duplicates
-        const deathKey = `${
-          deathEvent.username
-        }-${deathEvent.timestamp.getTime()}-${deathEvent.cause}`;
+        const deathKey = `${deathEvent.username}-${deathEvent.cause}`;
 
         if (this.recentDeathEvents.has(deathKey)) {
           this.logger.debug(`Skipping duplicate death event: ${deathKey}`);
@@ -191,13 +192,21 @@ export class LogParserService {
       } else {
         const joinEvent = this.parseJoinMessage(line);
         if (joinEvent && this.onJoinCallback) {
-          this.logger.info(`Parsed join from log: ${joinEvent}`);
-          this.onJoinCallback(joinEvent);
+          this.logger.info(
+            `Parsed join from log: ${
+              joinEvent.username
+            } at ${joinEvent.timestamp.toISOString()}`
+          );
+          this.onJoinCallback(joinEvent.username, joinEvent.timestamp);
         } else {
           const leaveEvent = this.parseLeaveMessage(line);
           if (leaveEvent && this.onLeaveCallback) {
-            this.logger.info(`Parsed leave from log: ${leaveEvent}`);
-            this.onLeaveCallback(leaveEvent);
+            this.logger.info(
+              `Parsed leave from log: ${
+                leaveEvent.username
+              } at ${leaveEvent.timestamp.toISOString()}`
+            );
+            this.onLeaveCallback(leaveEvent.username, leaveEvent.timestamp);
           }
         }
       }
@@ -216,6 +225,20 @@ export class LogParserService {
     if (!timestampMatch) {
       return null;
     }
+
+    const timeStr = timestampMatch[1];
+
+    // Parse the timestamp from the log
+    const today = new Date();
+    const [hours, minutes, seconds] = timeStr.split(":").map(Number);
+    const timestamp = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      hours,
+      minutes,
+      seconds
+    );
 
     // Look for death message patterns
     const deathPatterns = [
@@ -270,21 +293,6 @@ export class LogParserService {
           cause = cause || "died of mysterious causes";
         }
 
-        const today = new Date();
-        const [hours, minutes, seconds] = timestampMatch[1]
-          .split(":")
-          .map(Number);
-
-        // Create timestamp in server time (keep consistent for rate limiting)
-        const timestamp = new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate(),
-          hours,
-          minutes,
-          seconds
-        );
-
         return {
           username: playerId,
           timestamp,
@@ -296,33 +304,85 @@ export class LogParserService {
     return null;
   }
 
-  private parseJoinMessage(logLine: string): string | null {
+  private parseJoinMessage(
+    logLine: string
+  ): { username: string; timestamp: Date } | null {
     // Join message format: [16:34:59] [Server thread/INFO]: MaroonFranc joined the game
-    const joinPattern = /\[Server thread\/INFO\]:\s*(\w+)\s+joined the game/;
+    const joinPattern =
+      /^\[(\d{2}:\d{2}:\d{2})\].*\[Server thread\/INFO\]:\s*(\w+)\s+joined the game/;
     const match = joinPattern.exec(logLine);
 
     if (match) {
-      return match[1]; // Return the username
+      const timeStr = match[1];
+      const username = match[2];
+
+      // Parse the timestamp from the log
+      const today = new Date();
+      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
+      const timestamp = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        hours,
+        minutes,
+        seconds
+      );
+
+      return { username, timestamp };
     }
 
     return null;
   }
 
-  private parseLeaveMessage(logLine: string): string | null {
+  private parseLeaveMessage(
+    logLine: string
+  ): { username: string; timestamp: Date } | null {
     // Leave message formats:
     // [16:37:04] [Server thread/INFO]: MaroonFranc left the game
     // [19:53:23] [Server thread/INFO]: JackL64 lost connection: Disconnected
-    const leavePattern1 = /\[Server thread\/INFO\]:\s*(\w+)\s+left the game/;
-    const leavePattern2 = /\[Server thread\/INFO\]:\s*(\w+)\s+lost connection:/;
+    const leavePattern1 =
+      /^\[(\d{2}:\d{2}:\d{2})\].*\[Server thread\/INFO\]:\s*(\w+)\s+left the game/;
+    const leavePattern2 =
+      /^\[(\d{2}:\d{2}:\d{2})\].*\[Server thread\/INFO\]:\s*(\w+)\s+lost connection:/;
 
     let match = leavePattern1.exec(logLine);
     if (match) {
-      return match[1]; // Return the username
+      const timeStr = match[1];
+      const username = match[2];
+
+      // Parse the timestamp from the log
+      const today = new Date();
+      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
+      const timestamp = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        hours,
+        minutes,
+        seconds
+      );
+
+      return { username, timestamp };
     }
 
     match = leavePattern2.exec(logLine);
     if (match) {
-      return match[1]; // Return the username
+      const timeStr = match[1];
+      const username = match[2];
+
+      // Parse the timestamp from the log
+      const today = new Date();
+      const [hours, minutes, seconds] = timeStr.split(":").map(Number);
+      const timestamp = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        hours,
+        minutes,
+        seconds
+      );
+
+      return { username, timestamp };
     }
 
     return null;

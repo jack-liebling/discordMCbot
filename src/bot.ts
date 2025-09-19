@@ -146,23 +146,27 @@ export class DiscordBot {
           // Process death event from log
           const result = await this.playerTracker.recordDeath(deathEvent);
 
-          if (result.recorded && result.totalDeaths) {
+          if (
+            result.recorded &&
+            result.totalDeaths &&
+            result.timestampedEvent
+          ) {
             // Announce the death
             await this.announcementService.announcePlayerDeath(
-              deathEvent,
+              result.timestampedEvent,
               result.totalDeaths,
               result.previousDeathTimestamp || undefined
             );
           }
         },
         // Join callback
-        async (username) => {
-          await this.playerTracker.recordJoin(username);
+        async (username, timestamp) => {
+          await this.playerTracker.recordJoin(username, timestamp);
           this.logger.info(`Player joined: ${username}`);
         },
         // Leave callback
-        async (username) => {
-          await this.playerTracker.recordLeave(username);
+        async (username, timestamp) => {
+          await this.playerTracker.recordLeave(username, timestamp);
           this.logger.info(`Player left: ${username}`);
         }
       );

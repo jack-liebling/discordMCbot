@@ -50,14 +50,16 @@ export class PlayerTracker {
     recorded: boolean;
     totalDeaths: number;
     previousDeathTimestamp?: string | null;
+    timestampedEvent?: DeathEvent;
   }> {
     try {
       const username = deathEvent.username;
+      const deathTimestamp = deathEvent.timestamp; // Use timestamp from log
 
-      // Check for rate limiting using the new death's timestamp
+      // Check for rate limiting using the death's timestamp
       const rateLimitResult = await this.checkRateLimit(
         username,
-        deathEvent.timestamp
+        deathTimestamp
       );
       if (rateLimitResult.isLimited) {
         this.logger.warn(
@@ -65,6 +67,9 @@ export class PlayerTracker {
         );
         return { recorded: false, totalDeaths: 0 };
       }
+
+      // The event already has the correct timestamp
+      const timestampedEvent = deathEvent;
 
       // Get or create player
       let player = await this.storageService.getPlayer(username);
@@ -84,7 +89,7 @@ export class PlayerTracker {
       const deathActivity: ActivityEvent = {
         username,
         eventType: "DEATH",
-        timestamp: deathEvent.timestamp,
+        timestamp: deathTimestamp,
         details: deathEvent.cause,
       };
       await this.storageService.logActivity(deathActivity);
@@ -103,6 +108,7 @@ export class PlayerTracker {
         recorded: true,
         totalDeaths: newTotalDeaths,
         previousDeathTimestamp,
+        timestampedEvent,
       };
     } catch (error) {
       this.logger.error(
@@ -113,10 +119,8 @@ export class PlayerTracker {
     }
   }
 
-  async recordJoin(username: string): Promise<void> {
+  async recordJoin(username: string, timestamp: Date): Promise<void> {
     try {
-      const now = new Date();
-
       // Check for recent join events to prevent duplicates
       this.logger.info(`🔍 Checking for recent JOIN events for ${username}...`);
       const recentJoin = await this.storageService.getRecentActivity(
@@ -126,7 +130,7 @@ export class PlayerTracker {
       ); // 30 seconds
       if (recentJoin) {
         const secondsAgo = Math.round(
-          (now.getTime() - recentJoin.timestamp.getTime()) / 1000
+          (timestamp.getTime() - recentJoin.timestamp.getTime()) / 1000
         );
         this.logger.info(
           `🔴 SKIPPING duplicate join for ${username} - last join was ${secondsAgo}s ago at ${recentJoin.timestamp.toISOString()}`
@@ -145,13 +149,13 @@ export class PlayerTracker {
       const joinActivity: ActivityEvent = {
         username,
         eventType: "JOIN",
-        timestamp: now,
+        timestamp,
       };
       await this.storageService.logActivity(joinActivity);
 
       // Update player join timestamp
       await this.storageService.updatePlayer(username, {
-        lastJoin: now,
+        lastJoin: timestamp,
       });
 
       this.logger.info(`Recorded join for ${username}`);
@@ -160,10 +164,8 @@ export class PlayerTracker {
     }
   }
 
-  async recordLeave(username: string): Promise<void> {
+  async recordLeave(username: string, timestamp: Date): Promise<void> {
     try {
-      const now = new Date();
-
       // Check for recent leave events to prevent duplicates
       this.logger.info(
         `🔍 Checking for recent LEAVE events for ${username}...`
@@ -175,7 +177,7 @@ export class PlayerTracker {
       ); // 30 seconds
       if (recentLeave) {
         const secondsAgo = Math.round(
-          (now.getTime() - recentLeave.timestamp.getTime()) / 1000
+          (timestamp.getTime() - recentLeave.timestamp.getTime()) / 1000
         );
         this.logger.info(
           `🔴 SKIPPING duplicate leave for ${username} - last leave was ${secondsAgo}s ago at ${recentLeave.timestamp.toISOString()}`
@@ -194,13 +196,13 @@ export class PlayerTracker {
       const leaveActivity: ActivityEvent = {
         username,
         eventType: "LEAVE",
-        timestamp: now,
+        timestamp,
       };
       await this.storageService.logActivity(leaveActivity);
 
       // Update player leave timestamp
       await this.storageService.updatePlayer(username, {
-        lastLeave: now,
+        lastLeave: timestamp,
       });
 
       this.logger.info(`Recorded leave for ${username}`);
