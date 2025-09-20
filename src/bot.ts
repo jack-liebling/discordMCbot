@@ -1060,14 +1060,6 @@ export class DiscordBot {
         username,
         "DEATH"
       );
-      const recentJoins = await this.storageService.getPlayerActivities(
-        username,
-        "JOIN"
-      );
-      const recentLeaves = await this.storageService.getPlayerActivities(
-        username,
-        "LEAVE"
-      );
 
       // Check if player is currently online
       const sessionTracker = new SessionTracker(this.storageService);
@@ -1075,11 +1067,6 @@ export class DiscordBot {
         username
       );
       const isOnline = currentSessionStart !== null;
-
-      // Format last life duration
-      const lastLifeFormatted = sessionTracker.formatLastLifeDuration(
-        player.lastLifeDurationMs
-      );
 
       // Format total online time
       const totalOnlineFormatted = sessionTracker.formatOnlineTime(
