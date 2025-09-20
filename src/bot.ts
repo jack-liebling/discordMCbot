@@ -122,11 +122,13 @@ export class DiscordBot {
       this.playerTracker = new PlayerTracker(this.storageService);
 
       // Initialize announcement service
+      const adminUserIds = this.configLoader.getAdminUserIds();
       this.announcementService = new AnnouncementService(
         this.client,
         this.formatter,
         discordConfig.channelId,
-        discordConfig.guildId
+        discordConfig.guildId,
+        adminUserIds
       );
 
       // Initialize log parser - this is now required

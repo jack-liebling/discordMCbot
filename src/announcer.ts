@@ -17,6 +17,7 @@ export class AnnouncementService {
   private readonly logger = Logger.getInstance();
   private readonly channelId: string;
   private readonly guildId: string;
+  private readonly adminUserIds: string[];
 
   private channel: TextChannel | null = null;
   private isReady = false;
@@ -28,13 +29,15 @@ export class AnnouncementService {
     client: Client,
     formatter: DiscordFormatter,
     channelId: string,
-    guildId: string
+    guildId: string,
+    adminUserIds: string[] = []
   ) {
     this.client = client;
     this.formatter = formatter;
     this.leaderboardFormatter = new LeaderboardFormatter();
     this.channelId = channelId;
     this.guildId = guildId;
+    this.adminUserIds = adminUserIds;
   }
 
   async initialize(): Promise<void> {
@@ -161,34 +164,27 @@ export class AnnouncementService {
   }
 
   async sendBotStartup(): Promise<void> {
-    if (!this.isReady || !this.channel) {
-      this.queueMessage(() => this.sendBotStartup());
-      return;
-    }
-
     try {
       const embed = this.formatter.createStartupMessage();
-      await this.channel.send({ embeds: [embed] });
+      await this.sendPrivateMessageToAdmins(embed);
 
-      this.logger.info("Bot startup message sent");
+      this.logger.info("Bot startup message sent to admin users");
     } catch (error) {
-      this.logger.error("Failed to send startup message", error);
+      this.logger.error("Failed to send startup message to admin users", error);
     }
   }
 
   async sendBotShutdown(): Promise<void> {
-    if (!this.isReady || !this.channel) {
-      this.logger.warn("Cannot send shutdown message - service not ready");
-      return;
-    }
-
     try {
       const embed = this.formatter.createShutdownMessage();
-      await this.channel.send({ embeds: [embed] });
+      await this.sendPrivateMessageToAdmins(embed);
 
-      this.logger.info("Bot shutdown message sent");
+      this.logger.info("Bot shutdown message sent to admin users");
     } catch (error) {
-      this.logger.error("Failed to send shutdown message", error);
+      this.logger.error(
+        "Failed to send shutdown message to admin users",
+        error
+      );
     }
   }
 
@@ -599,6 +595,26 @@ export class AnnouncementService {
       }
     } catch (error) {
       this.logger.error("Failed to cleanup orphaned join messages", error);
+    }
+  }
+
+  private async sendPrivateMessageToAdmins(embed: any): Promise<void> {
+    if (this.adminUserIds.length === 0) {
+      this.logger.warn("No admin users configured, skipping private message");
+      return;
+    }
+
+    for (const adminId of this.adminUserIds) {
+      try {
+        const user = await this.client.users.fetch(adminId);
+        await user.send({ embeds: [embed] });
+        this.logger.debug(`Sent private message to admin: ${adminId}`);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send private message to admin ${adminId}`,
+          error
+        );
+      }
     }
   }
 }
