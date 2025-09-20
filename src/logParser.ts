@@ -338,6 +338,40 @@ export class LogParserService {
       return null;
     }
 
+    // Check if this is a chat message (format: <username> message)
+    // Chat messages should be ignored as they might contain death-like text
+    const chatPattern = /<\w+>/;
+    if (chatPattern.test(logLine)) {
+      this.logger.debug(`💬 Chat message detected, ignoring: "${logLine}"`);
+      return null;
+    }
+
+    // Check if this is a Minecraft slash command (either issued via server command or chat)
+    // Commands can appear as:
+    // [timestamp] [Server thread/INFO]: PlayerName issued server command: /command args
+    // [timestamp] [Async Chat Thread/INFO]: <PlayerName> /command args
+    const serverCommandPattern = /issued server command:\s*\//;
+    const chatCommandPattern = /<\w+>\s*\//;
+    if (
+      serverCommandPattern.test(logLine) ||
+      chatCommandPattern.test(logLine)
+    ) {
+      this.logger.debug(
+        `⚡ Minecraft command detected, ignoring: "${logLine}"`
+      );
+      return null;
+    }
+
+    // Check if this is an action message (emote) from /me command
+    // Action messages appear as: [timestamp] [Async Chat Thread/INFO]: * PlayerName action
+    const actionPattern = /\[Async Chat Thread[^\]]*\]:\s*\*\s*\w+/;
+    if (actionPattern.test(logLine)) {
+      this.logger.debug(
+        `🎭 Action message (emote) detected, ignoring: "${logLine}"`
+      );
+      return null;
+    }
+
     this.logger.debug(
       `⏰ Timestamp found: ${timestampMatch[1]} in line: "${logLine}"`
     );

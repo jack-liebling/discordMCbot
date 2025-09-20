@@ -85,7 +85,7 @@ export class DiscordFormatter {
         }
       )
       .setFooter({ text: this.serverName })
-      .setTimestamp(TimezoneUtils.toNewYorkTime(deathEvent.timestamp));
+      .setTimestamp(deathEvent.timestamp);
 
     this.logger.debug("Created death announcement embed", {
       player: deathEvent.username,
@@ -103,7 +103,7 @@ export class DiscordFormatter {
       .setDescription(errorMessage)
       .setColor(0xffff00 as ColorResolvable) // Yellow color
       .setFooter({ text: "Bot will retry automatically" })
-      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
+      .setTimestamp();
 
     this.logger.debug("Created connection error embed", { errorMessage });
 
@@ -121,7 +121,7 @@ export class DiscordFormatter {
       .setTitle("🤖 Bot Online")
       .setDescription(`Monitoring ${this.serverName} for player deaths`)
       .setColor(0x00ff00 as ColorResolvable) // Green color
-      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
+      .setTimestamp();
 
     this.logger.debug("Created startup message embed");
 
@@ -133,7 +133,7 @@ export class DiscordFormatter {
       .setTitle("🤖 Bot Offline")
       .setDescription(`No longer monitoring ${this.serverName}`)
       .setColor(0xff8000 as ColorResolvable) // Orange color
-      .setTimestamp(TimezoneUtils.getCurrentNewYorkTime());
+      .setTimestamp();
 
     this.logger.debug("Created shutdown message embed");
 
@@ -237,7 +237,7 @@ export class DiscordFormatter {
         inline: true,
       })
       .setFooter({ text: this.serverName })
-      .setTimestamp(TimezoneUtils.toNewYorkTime(timestamp));
+      .setTimestamp(timestamp);
 
     this.logger.debug("Created join announcement embed", {
       player: username,
@@ -263,7 +263,7 @@ export class DiscordFormatter {
         inline: true,
       })
       .setFooter({ text: this.serverName })
-      .setTimestamp(TimezoneUtils.toNewYorkTime(timestamp));
+      .setTimestamp(timestamp);
 
     this.logger.debug("Created leave announcement embed", {
       player: username,

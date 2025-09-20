@@ -417,6 +417,23 @@ export class DiscordBot {
           .setDescription(
             "Clear all join message records from the database (admin only)"
           ),
+        new SlashCommandBuilder()
+          .setName("set-player-deaths")
+          .setDescription("Set a player's total death count (admin only)")
+          .addStringOption((option) =>
+            option
+              .setName("username")
+              .setDescription("Username of the player")
+              .setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("deaths")
+              .setDescription("Number of deaths to set")
+              .setMinValue(0)
+              .setMaxValue(99999)
+              .setRequired(true)
+          ),
       ];
 
       const discordConfig = this.configLoader.getDiscordConfig();
@@ -516,6 +533,23 @@ export class DiscordBot {
             .setDescription(
               "Clear all join message records from the database (admin only)"
             ),
+          new SlashCommandBuilder()
+            .setName("set-player-deaths")
+            .setDescription("Set a player's total death count (admin only)")
+            .addStringOption((option) =>
+              option
+                .setName("username")
+                .setDescription("Username of the player")
+                .setRequired(true)
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("deaths")
+                .setDescription("Number of deaths to set")
+                .setMinValue(0)
+                .setMaxValue(99999)
+                .setRequired(true)
+            ),
         ];
 
         await rest.put(Routes.applicationCommands(this.client.user!.id), {
@@ -552,6 +586,8 @@ export class DiscordBot {
         await this.handleClearChannelCommand(interaction);
       } else if (interaction.commandName === "clear-join-messages") {
         await this.handleClearJoinMessagesCommand(interaction);
+      } else if (interaction.commandName === "set-player-deaths") {
+        await this.handleSetPlayerDeathsCommand(interaction);
       }
     } catch (error) {
       this.logger.error(
@@ -895,6 +931,85 @@ export class DiscordBot {
 
       await interaction.editReply({
         content: "❌ Failed to clear join messages. Please try again later.",
+      });
+    }
+  }
+
+  private async handleSetPlayerDeathsCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    // Admin-only command
+    if (!this.isUserAdmin(interaction.user.id)) {
+      await interaction.reply({
+        content: "❌ This command is restricted to administrators.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      // Get the username and deaths parameters
+      const username = interaction.options.getString("username", true);
+      const deaths = interaction.options.getInteger("deaths", true);
+
+      // Defer reply since this might take a moment
+      await interaction.deferReply({ ephemeral: true });
+
+      // Validate username format (basic validation)
+      if (!username.trim() || username.length > 50) {
+        await interaction.editReply({
+          content: "❌ Invalid username. Username must be 1-50 characters.",
+        });
+        return;
+      }
+
+      // Validate deaths value
+      if (deaths < 0 || deaths > 99999) {
+        await interaction.editReply({
+          content: "❌ Deaths must be between 0 and 99999.",
+        });
+        return;
+      }
+
+      // Check if player exists first
+      const existingPlayer = await this.storageService.getPlayer(
+        username.trim()
+      );
+
+      if (!existingPlayer) {
+        // Create new player with specified death count
+        await this.storageService.updatePlayer(username.trim(), {
+          totalDeaths: deaths,
+          createdAt: new Date(),
+        });
+
+        await interaction.editReply({
+          content: `✅ Created new player "${username}" with ${deaths} deaths.`,
+        });
+
+        this.logger.info(
+          `Created new player ${username} with ${deaths} deaths by ${interaction.user.tag}`
+        );
+      } else {
+        // Update existing player's death count
+        const previousDeaths = existingPlayer.totalDeaths;
+        await this.storageService.updatePlayer(username.trim(), {
+          totalDeaths: deaths,
+        });
+
+        await interaction.editReply({
+          content: `✅ Updated "${username}" death count from ${previousDeaths} to ${deaths}.`,
+        });
+
+        this.logger.info(
+          `Updated player ${username} death count from ${previousDeaths} to ${deaths} by ${interaction.user.tag}`
+        );
+      }
+    } catch (error) {
+      this.logger.error("Failed to set player death count", error);
+
+      await interaction.editReply({
+        content: "❌ Failed to set player death count. Please try again later.",
       });
     }
   }
