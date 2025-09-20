@@ -1095,14 +1095,6 @@ export class DiscordBot {
             inline: true,
           },
           {
-            name: "⏱️ Last Life Duration",
-            value:
-              player.lastLifeDurationMs > 0
-                ? lastLifeFormatted
-                : "No deaths yet",
-            inline: true,
-          },
-          {
             name: "🕒 Total Online Time",
             value: totalOnlineFormatted,
             inline: true,
@@ -1115,11 +1107,6 @@ export class DiscordBot {
           {
             name: "📅 First Seen",
             value: `<t:${Math.floor(player.createdAt.getTime() / 1000)}:R>`,
-            inline: true,
-          },
-          {
-            name: "📈 Activity Summary",
-            value: `${recentJoins.length} joins • ${recentLeaves.length} leaves • ${recentDeaths.length} deaths`,
             inline: true,
           },
         ],
