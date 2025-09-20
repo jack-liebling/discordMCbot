@@ -90,14 +90,21 @@ export class PlayerTracker {
       };
       await this.storageService.logActivity(deathActivity);
 
-      // Update player death count
+      // Calculate and store the last life duration
+      const lastLifeDuration =
+        await this.sessionTracker.calculateLastLifeDuration(username);
+
+      // Update player death count and last life duration
       const newTotalDeaths = player.totalDeaths + 1;
       await this.storageService.updatePlayer(username, {
         totalDeaths: newTotalDeaths,
+        lastLifeDurationMs: lastLifeDuration,
       });
 
       this.logger.info(
-        `Recorded death for ${username} (Total: ${newTotalDeaths})`
+        `Recorded death for ${username} (Total: ${newTotalDeaths}, Last life: ${this.sessionTracker.formatLastLifeDuration(
+          lastLifeDuration
+        )})`
       );
 
       return {

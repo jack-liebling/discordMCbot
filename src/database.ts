@@ -66,6 +66,7 @@ export class DatabaseService implements IStorageService {
         online_time_ms BIGINT NOT NULL DEFAULT 0,
         last_join TIMESTAMPTZ,
         last_leave TIMESTAMPTZ,
+        last_life_duration_ms BIGINT NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
@@ -177,6 +178,32 @@ export class DatabaseService implements IStorageService {
       throw error;
     }
 
+    // Migration: Add last_life_duration_ms column to existing players table if it doesn't exist
+    try {
+      const result = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'players' 
+        AND column_name = 'last_life_duration_ms'
+      `);
+
+      if (result.rows.length === 0) {
+        await client.query(
+          `ALTER TABLE players ADD COLUMN last_life_duration_ms BIGINT DEFAULT 0`
+        );
+        this.logger.debug(
+          "Added last_life_duration_ms column to players table"
+        );
+      }
+
+      this.logger.debug("Players table last life duration migration completed");
+    } catch (error) {
+      this.logger.error(
+        "Players table last life duration migration failed",
+        error
+      );
+      throw error;
+    }
+
     this.logger.info("Database tables created/verified");
   }
 
@@ -196,6 +223,7 @@ export class DatabaseService implements IStorageService {
         onlineTimeMs: parseInt(row.online_time_ms) || 0,
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
+        lastLifeDurationMs: parseInt(row.last_life_duration_ms) || 0,
         createdAt: row.created_at,
       }));
     } finally {
@@ -225,6 +253,7 @@ export class DatabaseService implements IStorageService {
         onlineTimeMs: parseInt(row.online_time_ms) || 0,
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
+        lastLifeDurationMs: parseInt(row.last_life_duration_ms) || 0,
         createdAt: row.created_at,
       };
     } finally {
@@ -273,13 +302,19 @@ export class DatabaseService implements IStorageService {
         paramIndex++;
       }
 
+      if (playerData.lastLifeDurationMs !== undefined) {
+        updateFields.push(`last_life_duration_ms = $${paramIndex}`);
+        values.push(playerData.lastLifeDurationMs);
+        paramIndex++;
+      }
+
       if (updateFields.length > 0) {
         // UPSERT: Insert new player or update existing one atomically
         const query = `
-          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, created_at)
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, created_at)
           VALUES ($1, $${paramIndex}, $${paramIndex + 1}, $${
           paramIndex + 2
-        }, $${paramIndex + 3}, NOW())
+        }, $${paramIndex + 3}, $${paramIndex + 4}, NOW())
           ON CONFLICT (username) DO UPDATE SET
             ${updateFields.join(", ")}
         `;
@@ -288,7 +323,8 @@ export class DatabaseService implements IStorageService {
           playerData.totalDeaths ?? 0,
           playerData.onlineTimeMs ?? 0,
           playerData.lastJoin ?? null,
-          playerData.lastLeave ?? null
+          playerData.lastLeave ?? null,
+          playerData.lastLifeDurationMs ?? 0
         );
 
         await client.query(query, values);
@@ -299,8 +335,8 @@ export class DatabaseService implements IStorageService {
         // Just ensure player exists if no specific updates
         const result = await client.query(
           `
-          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, created_at)
-          VALUES ($1, 0, 0, NULL, NULL, NOW())
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, created_at)
+          VALUES ($1, 0, 0, NULL, NULL, 0, NOW())
           ON CONFLICT (username) DO NOTHING
           RETURNING username
         `,

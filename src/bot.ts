@@ -12,6 +12,7 @@ import { ConfigLoader } from "./config";
 import { DatabaseService } from "./database";
 import { DiscordFormatter } from "./discord";
 import { PlayerTracker } from "./playerTracker";
+import { SessionTracker } from "./sessionTracker";
 import { AnnouncementService } from "./announcer";
 import { LogParserService } from "./logParser";
 import { LeaderboardService } from "./leaderboardService";
@@ -434,6 +435,15 @@ export class DiscordBot {
               .setMaxValue(99999)
               .setRequired(true)
           ),
+        new SlashCommandBuilder()
+          .setName("player-stats")
+          .setDescription("View detailed statistics for a player")
+          .addStringOption((option) =>
+            option
+              .setName("username")
+              .setDescription("Username of the player to view stats for")
+              .setRequired(true)
+          ),
       ];
 
       const discordConfig = this.configLoader.getDiscordConfig();
@@ -588,6 +598,8 @@ export class DiscordBot {
         await this.handleClearJoinMessagesCommand(interaction);
       } else if (interaction.commandName === "set-player-deaths") {
         await this.handleSetPlayerDeathsCommand(interaction);
+      } else if (interaction.commandName === "player-stats") {
+        await this.handlePlayerStatsCommand(interaction);
       }
     } catch (error) {
       this.logger.error(
@@ -1010,6 +1022,151 @@ export class DiscordBot {
 
       await interaction.editReply({
         content: "❌ Failed to set player death count. Please try again later.",
+      });
+    }
+  }
+
+  private async handlePlayerStatsCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    try {
+      await interaction.deferReply();
+
+      const username = interaction.options.getString("username", true).trim();
+
+      // Validate username
+      if (!username || username.length > 50) {
+        await interaction.editReply({
+          content: "❌ Invalid username. Username must be 1-50 characters.",
+        });
+        return;
+      }
+
+      // Get player data
+      const player = await this.storageService.getPlayer(username);
+
+      if (!player) {
+        await interaction.editReply({
+          content: `❌ Player "${username}" not found in the database.`,
+        });
+        return;
+      }
+
+      // Get recent activities for more context
+      const recentDeaths = await this.storageService.getPlayerActivities(
+        username,
+        "DEATH"
+      );
+      const recentJoins = await this.storageService.getPlayerActivities(
+        username,
+        "JOIN"
+      );
+      const recentLeaves = await this.storageService.getPlayerActivities(
+        username,
+        "LEAVE"
+      );
+
+      // Check if player is currently online
+      const sessionTracker = new SessionTracker(this.storageService);
+      const currentSessionStart = await sessionTracker.getCurrentSessionStart(
+        username
+      );
+      const isOnline = currentSessionStart !== null;
+
+      // Format last life duration
+      const lastLifeFormatted = sessionTracker.formatLastLifeDuration(
+        player.lastLifeDurationMs
+      );
+
+      // Format total online time
+      const totalOnlineFormatted = sessionTracker.formatOnlineTime(
+        player.onlineTimeMs
+      );
+
+      // Build stats embed
+      const embed = {
+        color: isOnline ? 0x00ff00 : 0x808080, // Green if online, gray if offline
+        title: `📊 Player Statistics: ${username}`,
+        fields: [
+          {
+            name: "💀 Total Deaths",
+            value: `${player.totalDeaths}`,
+            inline: true,
+          },
+          {
+            name: "⏱️ Last Life Duration",
+            value:
+              player.lastLifeDurationMs > 0
+                ? lastLifeFormatted
+                : "No deaths yet",
+            inline: true,
+          },
+          {
+            name: "🕒 Total Online Time",
+            value: totalOnlineFormatted,
+            inline: true,
+          },
+          {
+            name: "🔗 Status",
+            value: isOnline ? "🟢 Online" : "⚫ Offline",
+            inline: true,
+          },
+          {
+            name: "📅 First Seen",
+            value: `<t:${Math.floor(player.createdAt.getTime() / 1000)}:R>`,
+            inline: true,
+          },
+          {
+            name: "📈 Activity Summary",
+            value: `${recentJoins.length} joins • ${recentLeaves.length} leaves • ${recentDeaths.length} deaths`,
+            inline: true,
+          },
+        ],
+        footer: {
+          text: "Last life duration excludes offline time between Leave and Join events",
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      // Add last death info if player has died
+      if (recentDeaths.length > 0) {
+        const lastDeath = recentDeaths[0]; // Most recent death
+        embed.fields.push({
+          name: "💀 Last Death",
+          value: `${lastDeath.details || "Unknown cause"} (<t:${Math.floor(
+            lastDeath.timestamp.getTime() / 1000
+          )}:R>)`,
+          inline: false,
+        });
+      }
+
+      // Add current session info if online
+      if (isOnline && currentSessionStart) {
+        const currentSessionDuration =
+          Date.now() - currentSessionStart.getTime();
+        const currentSessionFormatted = sessionTracker.formatOnlineTime(
+          currentSessionDuration
+        );
+
+        embed.fields.push({
+          name: "🚀 Current Session",
+          value: `Started <t:${Math.floor(
+            currentSessionStart.getTime() / 1000
+          )}:R> (${currentSessionFormatted})`,
+          inline: false,
+        });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+
+      this.logger.info(
+        `Player stats displayed for ${username} by ${interaction.user.tag}`
+      );
+    } catch (error) {
+      this.logger.error("Failed to show player stats", error);
+
+      await interaction.editReply({
+        content: "❌ Failed to retrieve player stats. Please try again later.",
       });
     }
   }
