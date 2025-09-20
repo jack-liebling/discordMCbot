@@ -46,6 +46,7 @@ export class PlayerTracker {
     recorded: boolean;
     totalDeaths: number;
     previousDeathTimestamp?: string | null;
+    lastLifeDurationMs?: number;
     timestampedEvent?: DeathEvent;
   }> {
     try {
@@ -61,7 +62,7 @@ export class PlayerTracker {
         this.logger.warn(
           `Death rate limited for ${username} (${rateLimitResult.remainingSeconds}s remaining)`
         );
-        return { recorded: false, totalDeaths: 0 };
+        return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
       }
 
       // The event already has the correct timestamp
@@ -90,20 +91,28 @@ export class PlayerTracker {
       };
       await this.storageService.logActivity(deathActivity);
 
-      // Update player death count
+      // Calculate and store the last life duration
+      const lastLifeDuration =
+        await this.sessionTracker.calculateLastLifeDuration(username);
+
+      // Update player death count and last life duration
       const newTotalDeaths = player.totalDeaths + 1;
       await this.storageService.updatePlayer(username, {
         totalDeaths: newTotalDeaths,
+        lastLifeDurationMs: lastLifeDuration,
       });
 
       this.logger.info(
-        `Recorded death for ${username} (Total: ${newTotalDeaths})`
+        `Recorded death for ${username} (Total: ${newTotalDeaths}, Last life: ${this.sessionTracker.formatLastLifeDuration(
+          lastLifeDuration
+        )})`
       );
 
       return {
         recorded: true,
         totalDeaths: newTotalDeaths,
         previousDeathTimestamp,
+        lastLifeDurationMs: lastLifeDuration,
         timestampedEvent,
       };
     } catch (error) {
@@ -111,7 +120,7 @@ export class PlayerTracker {
         `Failed to record death for ${deathEvent.username}`,
         error
       );
-      return { recorded: false, totalDeaths: 0 };
+      return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
     }
   }
 

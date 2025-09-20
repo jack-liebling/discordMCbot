@@ -7,6 +7,7 @@ export interface Player {
   onlineTimeMs: number;
   lastJoin: Date | null;
   lastLeave: Date | null;
+  lastLifeDurationMs: number;
   createdAt: Date;
 }
 

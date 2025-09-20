@@ -290,8 +290,214 @@ export class SessionTracker {
   }
 
   /**
-   * Calculate current session time (from last JOIN to specified time)
+   * Format last life duration into human-readable string
+   * This is an alias for formatOnlineTime but provides semantic clarity
    */
+  formatLastLifeDuration(durationMs: number): string {
+    return this.formatOnlineTime(durationMs);
+  }
+
+  /**
+   * Calculate the duration of a player's last life (time alive before most recent death)
+   * Excludes offline time between LEAVE and JOIN events
+   * If player has never died, returns time from first JOIN to now
+   * If player has died before, returns time from second-to-last DEATH to last DEATH
+   */
+  async calculateLastLifeDuration(username: string): Promise<number> {
+    try {
+      // Get all death events for this player
+      const deathEvents = await this.storageService.getPlayerActivities(
+        username,
+        "DEATH"
+      );
+
+      if (deathEvents.length === 0) {
+        // Player has never died - calculate from first JOIN to now
+        const joinEvents = await this.storageService.getPlayerActivities(
+          username,
+          "JOIN"
+        );
+
+        if (joinEvents.length === 0) {
+          return 0; // No activity at all
+        }
+
+        // Get the first JOIN event
+        const sortedJoins = joinEvents.sort(
+          (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+        );
+        const firstJoin = sortedJoins[0];
+
+        // Calculate online time from first join to now
+        return await this.calculateOnlineTimeSince(
+          username,
+          firstJoin.timestamp
+        );
+      }
+
+      // Player has died at least once
+      deathEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      const sortedDeaths = deathEvents;
+      const lastDeath = sortedDeaths[0]; // Most recent death
+
+      let lifeStartTime: Date;
+
+      if (sortedDeaths.length === 1) {
+        // Only one death - life started from first JOIN
+        const joinEvents = await this.storageService.getPlayerActivities(
+          username,
+          "JOIN"
+        );
+
+        if (joinEvents.length === 0) {
+          return 0; // No join events found
+        }
+
+        joinEvents.sort(
+          (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+        );
+        const sortedJoins = joinEvents;
+        const firstJoin = sortedJoins[0];
+        lifeStartTime = firstJoin.timestamp;
+      } else {
+        // Multiple deaths - life started from second-to-last death
+        const secondToLastDeath = sortedDeaths[1];
+        lifeStartTime = secondToLastDeath.timestamp;
+      }
+
+      // Calculate online time from life start to last death
+      return await this.calculateOnlineTimeBetween(
+        username,
+        lifeStartTime,
+        lastDeath.timestamp
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to calculate last life duration for ${username}`,
+        error
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate online time between two specific timestamps
+   * Excludes time spent offline (between LEAVE and JOIN events)
+   */
+  async calculateOnlineTimeBetween(
+    username: string,
+    startTime: Date,
+    endTime: Date
+  ): Promise<number> {
+    try {
+      const joinEvents = await this.storageService.getPlayerActivities(
+        username,
+        "JOIN"
+      );
+      const leaveEvents = await this.storageService.getPlayerActivities(
+        username,
+        "LEAVE"
+      );
+
+      // Filter events to the time range and sort
+      const relevantJoins = joinEvents
+        .filter(
+          (event) => event.timestamp >= startTime && event.timestamp <= endTime
+        )
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+      const relevantLeaves = leaveEvents
+        .filter(
+          (event) => event.timestamp >= startTime && event.timestamp <= endTime
+        )
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+      let totalOnlineTime = 0;
+
+      // Check if player was already online at startTime
+      const lastJoinBefore = joinEvents
+        .filter((event) => event.timestamp <= startTime)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+
+      const lastLeaveBefore = leaveEvents
+        .filter((event) => event.timestamp <= startTime)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+
+      let wasOnlineAtStart = false;
+      if (
+        lastJoinBefore &&
+        (!lastLeaveBefore ||
+          lastJoinBefore.timestamp > lastLeaveBefore.timestamp)
+      ) {
+        wasOnlineAtStart = true;
+      }
+
+      let joinIndex = 0;
+      let leaveIndex = 0;
+
+      // Handle initial online session from startTime
+      if (wasOnlineAtStart) {
+        // Find first leave after startTime
+        const firstLeaveAfterStart = relevantLeaves.find(
+          (leave) => leave.timestamp > startTime
+        );
+
+        if (firstLeaveAfterStart) {
+          // Player was online from startTime until first leave
+          totalOnlineTime +=
+            firstLeaveAfterStart.timestamp.getTime() - startTime.getTime();
+
+          // Skip this leave event since we already processed it
+          leaveIndex = relevantLeaves.indexOf(firstLeaveAfterStart) + 1;
+        } else {
+          // Player was online from startTime until endTime (no leaves in range)
+          totalOnlineTime += endTime.getTime() - startTime.getTime();
+        }
+      }
+
+      // Process JOIN/LEAVE pairs within the time range
+      while (joinIndex < relevantJoins.length) {
+        const joinTime = relevantJoins[joinIndex].timestamp;
+
+        // Find corresponding LEAVE after this JOIN
+        let leaveTime: Date | null = null;
+        while (leaveIndex < relevantLeaves.length) {
+          if (relevantLeaves[leaveIndex].timestamp > joinTime) {
+            leaveTime = relevantLeaves[leaveIndex].timestamp;
+            leaveIndex++;
+            break;
+          }
+          leaveIndex++;
+        }
+
+        const sessionEnd = leaveTime || endTime; // Use endTime if no leave found
+        const sessionDuration = sessionEnd.getTime() - joinTime.getTime();
+        totalOnlineTime += sessionDuration;
+
+        this.logger.debug(
+          `Session for ${username}: ${sessionDuration}ms (${joinTime.toISOString()} to ${sessionEnd.toISOString()})`
+        );
+
+        joinIndex++;
+
+        // If we used endTime as session end, break the loop
+        if (!leaveTime) {
+          break;
+        }
+      }
+
+      this.logger.debug(
+        `Online time between ${startTime.toISOString()} and ${endTime.toISOString()} for ${username}: ${totalOnlineTime}ms`
+      );
+      return totalOnlineTime;
+    } catch (error) {
+      this.logger.error(
+        `Failed to calculate online time between timestamps for ${username}`,
+        error
+      );
+      return 0;
+    }
+  }
   async calculateCurrentSessionTime(
     username: string,
     endTime: Date
