@@ -46,6 +46,7 @@ export class PlayerTracker {
     recorded: boolean;
     totalDeaths: number;
     previousDeathTimestamp?: string | null;
+    lastLifeDurationMs?: number;
     timestampedEvent?: DeathEvent;
   }> {
     try {
@@ -61,7 +62,7 @@ export class PlayerTracker {
         this.logger.warn(
           `Death rate limited for ${username} (${rateLimitResult.remainingSeconds}s remaining)`
         );
-        return { recorded: false, totalDeaths: 0 };
+        return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
       }
 
       // The event already has the correct timestamp
@@ -111,6 +112,7 @@ export class PlayerTracker {
         recorded: true,
         totalDeaths: newTotalDeaths,
         previousDeathTimestamp,
+        lastLifeDurationMs: lastLifeDuration,
         timestampedEvent,
       };
     } catch (error) {
@@ -118,7 +120,7 @@ export class PlayerTracker {
         `Failed to record death for ${deathEvent.username}`,
         error
       );
-      return { recorded: false, totalDeaths: 0 };
+      return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
     }
   }
 

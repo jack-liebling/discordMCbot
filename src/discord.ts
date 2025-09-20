@@ -18,49 +18,31 @@ export class DiscordFormatter {
   async createDeathAnnouncementEmbed(
     deathEvent: DeathEvent,
     totalDeaths: number,
-    previousDeathTimestamp?: string | null
+    previousDeathTimestamp?: string | null,
+    lastLifeDurationMs?: number
   ): Promise<EmbedBuilder> {
-    // Calculate online time since last death including current session
+    // Use the pre-calculated last life duration from the database
     let onlineTimeSinceLastDeath: string;
-    if (!previousDeathTimestamp) {
-      // First death - calculate total online time including current session
-      const storedOnlineTime = await this.sessionTracker.calculateOnlineTime(
-        deathEvent.username
-      );
-
-      // Add current session time (from last JOIN to now)
-      const currentSessionTime =
-        await this.sessionTracker.calculateCurrentSessionTime(
-          deathEvent.username,
-          deathEvent.timestamp
-        );
-
-      const totalOnlineTimeMs = storedOnlineTime + currentSessionTime;
-      onlineTimeSinceLastDeath =
-        totalOnlineTimeMs > 0
-          ? this.sessionTracker.formatOnlineTime(totalOnlineTimeMs)
-          : "First session";
+    if (lastLifeDurationMs !== undefined) {
+      if (lastLifeDurationMs > 0) {
+        // Use the stored last life duration value (works for both first and subsequent deaths)
+        onlineTimeSinceLastDeath =
+          this.sessionTracker.formatLastLifeDuration(lastLifeDurationMs);
+      } else {
+        // Edge case: no meaningful duration calculated
+        onlineTimeSinceLastDeath = "No time alive";
+      }
     } else {
-      // Calculate online time since last death including current session
-      const lastDeathTime = new Date(previousDeathTimestamp);
-
-      // Get online time from completed sessions since last death
-      const completedSessionsTime =
-        await this.sessionTracker.calculateOnlineTimeSince(
-          deathEvent.username,
-          lastDeathTime
-        );
-
-      // Add current session time (from last JOIN to death time)
-      const currentSessionTime =
-        await this.sessionTracker.calculateCurrentSessionTime(
-          deathEvent.username,
-          deathEvent.timestamp
-        );
-
-      const totalOnlineTimeMs = completedSessionsTime + currentSessionTime;
-      onlineTimeSinceLastDeath =
-        this.sessionTracker.formatOnlineTime(totalOnlineTimeMs);
+      // This should not happen in normal operation since we always calculate lastLifeDurationMs
+      this.logger.error(
+        "No lastLifeDurationMs provided for death announcement",
+        {
+          username: deathEvent.username,
+          totalDeaths,
+          previousDeathTimestamp,
+        }
+      );
+      onlineTimeSinceLastDeath = "Duration unavailable";
     }
 
     const embed = new EmbedBuilder()

@@ -73,7 +73,8 @@ export class AnnouncementService {
   async announcePlayerDeath(
     deathEvent: DeathEvent,
     totalDeaths: number,
-    previousDeathTimestamp?: string
+    previousDeathTimestamp?: string,
+    lastLifeDurationMs?: number
   ): Promise<void> {
     if (!this.isReady || !this.channel) {
       // Queue the message for later processing
@@ -81,7 +82,8 @@ export class AnnouncementService {
         this.announcePlayerDeath(
           deathEvent,
           totalDeaths,
-          previousDeathTimestamp
+          previousDeathTimestamp,
+          lastLifeDurationMs
         )
       );
       return;
@@ -91,7 +93,8 @@ export class AnnouncementService {
       const embed = await this.formatter.createDeathAnnouncementEmbed(
         deathEvent,
         totalDeaths,
-        previousDeathTimestamp
+        previousDeathTimestamp,
+        lastLifeDurationMs
       );
 
       // Validate embed before sending

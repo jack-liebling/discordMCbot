@@ -164,7 +164,8 @@ export class DiscordBot {
             await this.announcementService.announcePlayerDeath(
               result.timestampedEvent,
               result.totalDeaths,
-              result.previousDeathTimestamp || undefined
+              result.previousDeathTimestamp || undefined,
+              result.lastLifeDurationMs
             );
           }
         },
