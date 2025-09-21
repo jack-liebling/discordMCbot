@@ -65,7 +65,19 @@ export class DiscordFormatter {
           value: `Death #${totalDeaths}`,
           inline: true,
         }
-      )
+      );
+
+    // Add PvP kill information if applicable
+    if (deathEvent.killerUsername) {
+      embed.addFields({
+        name: "🗡️ Killed By",
+        value: `${deathEvent.killerUsername} (received death reduction reward)`,
+        inline: false,
+      });
+      embed.setColor(0xffa500 as ColorResolvable); // Orange color for PvP deaths
+    }
+
+    embed
       .setFooter({ text: this.serverName })
       .setTimestamp(deathEvent.timestamp);
 

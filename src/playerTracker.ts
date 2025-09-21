@@ -108,6 +108,24 @@ export class PlayerTracker {
         )})`
       );
 
+      // Handle PvP kill reward: subtract 1 death from killer
+      if (deathEvent.killerUsername) {
+        try {
+          await this.storageService.subtractPlayerDeath(
+            deathEvent.killerUsername
+          );
+          this.logger.info(
+            `🗡️ PvP kill reward: Subtracted 1 death from ${deathEvent.killerUsername} for killing ${username}`
+          );
+        } catch (killerError) {
+          this.logger.error(
+            `Failed to subtract death from killer ${deathEvent.killerUsername}`,
+            killerError
+          );
+          // Don't fail the whole operation if killer reward fails
+        }
+      }
+
       return {
         recorded: true,
         totalDeaths: newTotalDeaths,
