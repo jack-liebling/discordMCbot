@@ -67,6 +67,7 @@ export class DatabaseService implements IStorageService {
         last_join TIMESTAMPTZ,
         last_leave TIMESTAMPTZ,
         last_life_duration_ms BIGINT NOT NULL DEFAULT 0,
+        highest_death_milestone INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
@@ -204,6 +205,34 @@ export class DatabaseService implements IStorageService {
       throw error;
     }
 
+    // Migration: Add highest_death_milestone column to existing players table if it doesn't exist
+    try {
+      const result = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'players' 
+        AND column_name = 'highest_death_milestone'
+      `);
+
+      if (result.rows.length === 0) {
+        await client.query(
+          `ALTER TABLE players ADD COLUMN highest_death_milestone INTEGER DEFAULT 0`
+        );
+        this.logger.debug(
+          "Added highest_death_milestone column to players table"
+        );
+      }
+
+      this.logger.debug(
+        "Players table highest death milestone migration completed"
+      );
+    } catch (error) {
+      this.logger.error(
+        "Players table highest death milestone migration failed",
+        error
+      );
+      throw error;
+    }
+
     this.logger.info("Database tables created/verified");
   }
 
@@ -224,6 +253,7 @@ export class DatabaseService implements IStorageService {
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
         lastLifeDurationMs: parseInt(row.last_life_duration_ms) || 0,
+        highestDeathMilestone: row.highest_death_milestone || 0,
         createdAt: row.created_at,
       }));
     } finally {
@@ -254,6 +284,7 @@ export class DatabaseService implements IStorageService {
         lastJoin: row.last_join,
         lastLeave: row.last_leave,
         lastLifeDurationMs: parseInt(row.last_life_duration_ms) || 0,
+        highestDeathMilestone: row.highest_death_milestone || 0,
         createdAt: row.created_at,
       };
     } finally {

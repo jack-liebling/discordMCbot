@@ -77,7 +77,9 @@ export class AnnouncementService {
     deathEvent: DeathEvent,
     totalDeaths: number,
     previousDeathTimestamp?: string,
-    lastLifeDurationMs?: number
+    lastLifeDurationMs?: number,
+    isNewMilestone?: boolean,
+    milestoneReached?: number
   ): Promise<void> {
     if (!this.isReady || !this.channel) {
       // Queue the message for later processing
@@ -86,19 +88,31 @@ export class AnnouncementService {
           deathEvent,
           totalDeaths,
           previousDeathTimestamp,
-          lastLifeDurationMs
+          lastLifeDurationMs,
+          isNewMilestone,
+          milestoneReached
         )
       );
       return;
     }
 
     try {
-      const embed = await this.formatter.createDeathAnnouncementEmbed(
-        deathEvent,
-        totalDeaths,
-        previousDeathTimestamp,
-        lastLifeDurationMs
-      );
+      // Use milestone embed if this is a new milestone, otherwise use regular embed
+      const embed =
+        isNewMilestone && milestoneReached
+          ? await this.formatter.createMilestoneAnnouncementEmbed(
+              deathEvent,
+              totalDeaths,
+              milestoneReached,
+              previousDeathTimestamp,
+              lastLifeDurationMs
+            )
+          : await this.formatter.createDeathAnnouncementEmbed(
+              deathEvent,
+              totalDeaths,
+              previousDeathTimestamp,
+              lastLifeDurationMs
+            );
 
       // Validate embed before sending
       const validation = this.formatter.validateEmbed(embed);

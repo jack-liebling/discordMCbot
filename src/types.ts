@@ -8,6 +8,7 @@ export interface Player {
   lastJoin: Date | null;
   lastLeave: Date | null;
   lastLifeDurationMs: number;
+  highestDeathMilestone: number; // Tracks highest multiple of 10 deaths achieved
   createdAt: Date;
 }
 
