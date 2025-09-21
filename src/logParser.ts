@@ -533,8 +533,8 @@ export class LogParserService {
       }
     }
 
-    // Basic player username pattern: 3-16 chars, alphanumeric + underscore
-    const playerPattern = /^\w{3,16}$/;
+    // Basic player username pattern: 3-16 chars, must start with a letter, alphanumeric + underscore
+    const playerPattern = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
     return playerPattern.test(cleanName);
   }
 
