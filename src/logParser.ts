@@ -2,6 +2,7 @@
 import FtpClient = require("ftp");
 import { FtpConfig, DeathEvent, IStorageService } from "./types";
 import { Logger } from "./logger";
+import { DEATH_PATTERNS } from "./deathPatterns";
 
 export class LogParserService {
   private readonly logger = Logger.getInstance();
@@ -380,152 +381,13 @@ export class LogParserService {
     // This represents when the server actually wrote this log entry
     const timestamp = new Date();
 
-    // Look for death message patterns (Java Edition comprehensive list)
-    const deathPatterns = [
-      // Cactus
-      /(\w+) was pricked to death/,
-      /(\w+) walked into a cactus while trying to escape (.+)/,
-
-      // Drowning
-      /(\w+) drowned/,
-      /(\w+) drowned while trying to escape (.+)/,
-
-      // Drying out (dolphins/axolotls)
-      /(\w+) died from dehydration/,
-      /(\w+) died from dehydration while trying to escape (.+)/,
-
-      // Elytra
-      /(\w+) experienced kinetic energy/,
-      /(\w+) experienced kinetic energy while trying to escape (.+)/,
-
-      // Explosions
-      /(\w+) blew up/,
-      /(\w+) was blown up by (.+)/,
-      /(\w+) was blown up by (.+) using (.+)/,
-      /(\w+) was killed by \[Intentional Game Design\]/,
-
-      // Falling
-      /(\w+) hit the ground too hard/,
-      /(\w+) hit the ground too hard while trying to escape (.+)/,
-      /(\w+) fell from a high place/,
-      /(\w+) fell off a ladder/,
-      /(\w+) fell off some vines/,
-      /(\w+) fell off some weeping vines/,
-      /(\w+) fell off some twisting vines/,
-      /(\w+) fell off scaffolding/,
-      /(\w+) fell while climbing/,
-      /(\w+) was doomed to fall/,
-      /(\w+) was doomed to fall by (.+)/,
-      /(\w+) was doomed to fall by (.+) using (.+)/,
-      /(\w+) was impaled on a stalagmite/,
-      /(\w+) was impaled on a stalagmite while fighting (.+)/,
-
-      // Falling blocks
-      /(\w+) was squashed by a falling anvil/,
-      /(\w+) was squashed by a falling block/,
-      /(\w+) was skewered by a falling stalactite/,
-
-      // Fire
-      /(\w+) went up in flames/,
-      /(\w+) walked into fire while fighting (.+)/,
-      /(\w+) burned to death/,
-      /(\w+) was burned to a crisp while fighting (.+)/,
-
-      // Firework rockets
-      /(\w+) went off with a bang/,
-      /(\w+) went off with a bang due to a firework fired from (.+) by (.+)/,
-
-      // Lava
-      /(\w+) tried to swim in lava/,
-      /(\w+) tried to swim in lava to escape (.+)/,
-
-      // Lightning
-      /(\w+) was struck by lightning/,
-      /(\w+) was struck by lightning while fighting (.+)/,
-
-      // Magma block
-      /(\w+) discovered the floor was lava/,
-      /(\w+) walked into the danger zone due to (.+)/,
-
-      // Magic (Instant Damage / evoker fangs / guardian laser)
-      /(\w+) was killed by magic/,
-      /(\w+) was killed by magic while trying to escape (.+)/,
-      /(\w+) was killed by (.+) using magic/,
-      /(\w+) was killed by (.+) using (.+)/,
-
-      // Powder snow
-      /(\w+) froze to death/,
-      /(\w+) was frozen to death by (.+)/,
-
-      // Players and mobs
-      /(\w+) was slain by (.+)/,
-      /(\w+) was slain by (.+) using (.+)/,
-      /(\w+) was stung to death/,
-      /(\w+) was stung to death by (.+) using (.+)/,
-      /(\w+) was obliterated by a sonically-charged shriek/,
-      /(\w+) was obliterated by a sonically-charged shriek while trying to escape (.+) wielding (.+)/,
-      /(\w+) was smashed by (.+)/,
-      /(\w+) was smashed by (.+) with (.+)/,
-
-      // Projectiles
-      /(\w+) was shot by (.+)/,
-      /(\w+) was shot by (.+) using (.+)/,
-      /(\w+) was pummeled by (.+)/,
-      /(\w+) was pummeled by (.+) using (.+)/,
-      /(\w+) was fireballed by (.+)/,
-      /(\w+) was fireballed by (.+) using (.+)/,
-      /(\w+) was shot by a skull from (.+)/,
-      /(\w+) was shot by a skull from (.+) using (.+)/,
-
-      // Starving
-      /(\w+) starved to death/,
-      /(\w+) starved to death while fighting (.+)/,
-
-      // Suffocation
-      /(\w+) suffocated in a wall/,
-      /(\w+) suffocated in a wall while fighting (.+)/,
-      /(\w+) was squished too much/,
-      /(\w+) was squashed by (.+)/,
-      /(\w+) left the confines of this world/,
-      /(\w+) left the confines of this world while fighting (.+)/,
-
-      // Sweet berry bushes
-      /(\w+) was poked to death by a sweet berry bush/,
-      /(\w+) was poked to death by a sweet berry bush while trying to escape (.+)/,
-
-      // Thorns enchantment
-      /(\w+) was killed while trying to hurt (.+)/,
-      /(\w+) was killed by (.+) while trying to hurt (.+)/,
-
-      // Trident
-      /(\w+) was impaled by (.+)/,
-      /(\w+) was impaled by (.+) with (.+)/,
-
-      // Void
-      /(\w+) fell out of the world/,
-      /(\w+) didn't want to live in the same world as (.+)/,
-
-      // Wither effect
-      /(\w+) withered away/,
-      /(\w+) withered away while fighting (.+)/,
-
-      // Generic death
-      /(\w+) died/,
-      /(\w+) died because of (.+)/,
-      /(\w+) was killed/,
-      /(\w+) was killed while fighting (.+)/,
-
-      // Dragon's breath
-      /(\w+) was roasted in dragon's breath/,
-      /(\w+) was roasted in dragon's breath by (.+)/,
-    ];
-
+    // Use imported death patterns
     this.logger.debug(
-      `🔎 Testing ${deathPatterns.length} death patterns against: "${logLine}"`
+      `🔎 Testing ${DEATH_PATTERNS.length} death patterns against: "${logLine}"`
     );
 
-    for (let i = 0; i < deathPatterns.length; i++) {
-      const pattern = deathPatterns[i];
+    for (let i = 0; i < DEATH_PATTERNS.length; i++) {
+      const pattern = DEATH_PATTERNS[i];
       const match = pattern.exec(logLine);
       if (match) {
         this.logger.debug(
@@ -536,6 +398,26 @@ export class LogParserService {
 
         const playerId = match[1];
         let cause = match[0].substring(playerId.length + 1); // Remove player name and space
+        let killerUsername: string | undefined;
+
+        // Check if this is a PvP kill by examining capture groups
+        // Handle patterns with "using weapon" vs simple killer patterns
+        if (match[2]) {
+          let potentialKiller = match[2].trim();
+
+          // For patterns like "was slain by Player using Sword", the killer is still in match[2]
+          // We need to extract just the killer name without the weapon part
+          if (potentialKiller.includes(" using ")) {
+            potentialKiller = potentialKiller.split(" using ")[0].trim();
+          }
+
+          if (this.isPlayerUsername(potentialKiller)) {
+            killerUsername = potentialKiller;
+            this.logger.info(
+              `🗡️ PvP KILL DETECTED: ${killerUsername} killed ${playerId}`
+            );
+          }
+        }
 
         // Clean up the cause message
         if (
@@ -550,19 +432,110 @@ export class LogParserService {
         }
 
         this.logger.debug(
-          `💀 Parsed death: Player="${playerId}", Cause="${cause}", Original="${match[0]}"`
+          `💀 Parsed death: Player="${playerId}", Cause="${cause}", Killer="${
+            killerUsername || "none"
+          }", Original="${match[0]}"`
         );
 
         return {
           username: playerId,
           timestamp,
           cause,
+          killerUsername,
         };
       }
     }
 
     this.logger.debug(`❌ No death patterns matched for line: "${logLine}"`);
     return null;
+  }
+
+  /**
+   * Helper function to detect if a killer name is likely a player username
+   * Minecraft usernames are 3-16 characters, alphanumeric + underscore
+   */
+  private isPlayerUsername(name: string): boolean {
+    // Remove common prefixes that indicate mobs/environment
+    const cleanName = name.trim();
+
+    // Skip obviously non-player entities
+    const nonPlayerKeywords = [
+      "a ",
+      "an ",
+      "the ",
+      "Zombie",
+      "Skeleton",
+      "Creeper",
+      "Spider",
+      "Enderman",
+      "Witch",
+      "Blaze",
+      "Ghast",
+      "Slime",
+      "Wither",
+      "Dragon",
+      "Phantom",
+      "Pillager",
+      "Vindicator",
+      "Evoker",
+      "Vex",
+      "Ravager",
+      "Guardian",
+      "Elder Guardian",
+      "Shulker",
+      "Silverfish",
+      "Endermite",
+      "Cave Spider",
+      "Magma Cube",
+      "Husk",
+      "Stray",
+      "Wither Skeleton",
+      "Piglin",
+      "Hoglin",
+      "Zoglin",
+      "Zombified Piglin",
+      "Strider",
+      "Goat",
+      "Axolotl",
+      "Glow Squid",
+      "Allay",
+      "Frog",
+      "Tadpole",
+      "Warden",
+      "Camel",
+      "Sniffer",
+      "Breeze",
+      "Bogged",
+      "Wolf",
+      "Cat",
+      "Ocelot",
+      "Horse",
+      "Donkey",
+      "Mule",
+      "Llama",
+      "Trader Llama",
+      "Wandering Trader",
+      "Iron Golem",
+      "Snow Golem",
+      "Lightning",
+      "Cactus",
+      "Fire",
+      "Lava",
+      "Magma",
+      "Berry Bush",
+      "Intentional Game Design",
+    ];
+
+    // Check if the name contains any non-player keywords
+    for (const keyword of nonPlayerKeywords) {
+      if (cleanName.toLowerCase().includes(keyword.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // Basic player username pattern: 3-16 chars, must start with a letter, alphanumeric + underscore
+    const playerPattern = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
+    return playerPattern.test(cleanName);
   }
 
   private parseJoinMessage(

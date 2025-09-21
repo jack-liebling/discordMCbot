@@ -410,6 +410,36 @@ export class DatabaseService implements IStorageService {
   }
 
   /**
+   * Subtract one death from a player's total (for PvP kill rewards)
+   */
+  async subtractPlayerDeath(username: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      // Only subtract if player has at least 1 death to prevent negative counts
+      const result = await client.query(
+        `UPDATE players 
+         SET total_deaths = GREATEST(total_deaths - 1, 0)
+         WHERE username = $1 AND total_deaths > 0
+         RETURNING total_deaths`,
+        [username]
+      );
+
+      if (result.rows.length > 0) {
+        const newDeathCount = result.rows[0].total_deaths;
+        this.logger.info(
+          `Subtracted 1 death from ${username} (PvP kill reward). New total: ${newDeathCount}`
+        );
+      } else {
+        this.logger.debug(
+          `No death subtracted for ${username} - player has 0 deaths or doesn't exist`
+        );
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Log a player activity event
    */
   async logActivity(activity: ActivityEvent): Promise<void> {

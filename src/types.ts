@@ -28,6 +28,7 @@ export interface DeathEvent {
   username: string;
   timestamp: Date;
   cause: string;
+  killerUsername?: string; // Set when killed by another player
 }
 
 // Daily leaderboard data structures
@@ -136,6 +137,7 @@ export interface IStorageService {
   getAllPlayers(): Promise<Player[]>;
   resetAllPlayerDeaths(): Promise<number>;
   deletePlayer(username: string): Promise<boolean>;
+  subtractPlayerDeath(username: string): Promise<void>;
 
   // Activity logging
   logActivity(activity: ActivityEvent): Promise<void>;
