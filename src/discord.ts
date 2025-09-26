@@ -91,6 +91,75 @@ export class DiscordFormatter {
     return embed;
   }
 
+  async createMilestoneAnnouncementEmbed(
+    deathEvent: DeathEvent,
+    totalDeaths: number,
+    milestoneReached: number,
+    previousDeathTimestamp?: string | null,
+    lastLifeDurationMs?: number
+  ): Promise<EmbedBuilder> {
+    // Use the pre-calculated last life duration from the database
+    let onlineTimeSinceLastDeath: string;
+    if (lastLifeDurationMs !== undefined) {
+      if (lastLifeDurationMs > 0) {
+        onlineTimeSinceLastDeath =
+          this.sessionTracker.formatLastLifeDuration(lastLifeDurationMs);
+      } else {
+        onlineTimeSinceLastDeath = "No time alive";
+      }
+    } else {
+      onlineTimeSinceLastDeath = "Duration unavailable";
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle("🎯 DEATH MILESTONE REACHED! 🎯")
+      .setDescription(
+        `**${deathEvent.username}** has reached **${milestoneReached} deaths!**\n\n*Latest death: ${deathEvent.cause}*`
+      )
+      .setColor(0x8b0000 as ColorResolvable) // Dark red color for milestones
+      .addFields(
+        {
+          name: "🏆 Milestone",
+          value: `${milestoneReached} Deaths`,
+          inline: true,
+        },
+        {
+          name: "Time of Death",
+          value: this.formatTimestamp(deathEvent.timestamp),
+          inline: true,
+        },
+        {
+          name: "Survived For",
+          value: onlineTimeSinceLastDeath,
+          inline: true,
+        }
+      );
+
+    // Add PvP kill information if applicable
+    if (deathEvent.killerUsername) {
+      embed.addFields({
+        name: "🗡️ Killed By",
+        value: `${deathEvent.killerUsername} (received death reduction reward)`,
+        inline: false,
+      });
+    }
+
+    embed
+      .setFooter({
+        text: `${this.serverName} • First time reaching this milestone!`,
+      })
+      .setTimestamp(deathEvent.timestamp);
+
+    this.logger.debug("Created milestone announcement embed", {
+      player: deathEvent.username,
+      cause: deathEvent.cause,
+      milestone: milestoneReached,
+      totalDeaths,
+    });
+
+    return embed;
+  }
+
   createConnectionErrorEmbed(errorMessage: string): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle("⚠️ Connection Issue")

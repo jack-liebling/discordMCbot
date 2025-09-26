@@ -167,7 +167,9 @@ export class DiscordBot {
               result.timestampedEvent,
               result.totalDeaths,
               result.previousDeathTimestamp || undefined,
-              result.lastLifeDurationMs
+              result.lastLifeDurationMs,
+              result.isNewMilestone,
+              result.milestoneReached
             );
           }
         },
@@ -1084,6 +1086,14 @@ export class DiscordBot {
             inline: true,
           },
           {
+            name: "🎯 Highest Milestone",
+            value:
+              player.highestDeathMilestone > 0
+                ? `${player.highestDeathMilestone} Deaths`
+                : "None",
+            inline: true,
+          },
+          {
             name: "🕒 Total Online Time",
             value: totalOnlineFormatted,
             inline: true,
@@ -1099,9 +1109,6 @@ export class DiscordBot {
             inline: true,
           },
         ],
-        footer: {
-          text: "Last life duration excludes offline time between Leave and Join events",
-        },
         timestamp: new Date().toISOString(),
       };
 

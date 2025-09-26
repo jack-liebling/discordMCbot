@@ -48,6 +48,8 @@ export class PlayerTracker {
     previousDeathTimestamp?: string | null;
     lastLifeDurationMs?: number;
     timestampedEvent?: DeathEvent;
+    isNewMilestone?: boolean;
+    milestoneReached?: number;
   }> {
     try {
       const username = deathEvent.username;
@@ -62,7 +64,13 @@ export class PlayerTracker {
         this.logger.warn(
           `Death rate limited for ${username} (${rateLimitResult.remainingSeconds}s remaining)`
         );
-        return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
+        return {
+          recorded: false,
+          totalDeaths: 0,
+          lastLifeDurationMs: 0,
+          isNewMilestone: false,
+          milestoneReached: undefined,
+        };
       }
 
       // The event already has the correct timestamp
@@ -95,12 +103,35 @@ export class PlayerTracker {
       const lastLifeDuration =
         await this.sessionTracker.calculateLastLifeDuration(username);
 
-      // Update player death count and last life duration
+      // Check for death milestone (multiples of 10)
+      // Only triggers special announcement for NEW milestones (first time reaching each level)
+      // Example: Player reaches 10 deaths -> special announcement
+      //          Player gets PvP kill, drops to 9 deaths, then dies again to reach 10 -> normal announcement
       const newTotalDeaths = player.totalDeaths + 1;
-      await this.storageService.updatePlayer(username, {
+      const currentMilestone = Math.floor(newTotalDeaths / 10) * 10;
+      const previousHighestMilestone = player.highestDeathMilestone;
+      const isNewMilestone =
+        currentMilestone > 0 && currentMilestone > previousHighestMilestone;
+
+      let milestoneReached: number | undefined;
+      if (isNewMilestone) {
+        milestoneReached = currentMilestone;
+        this.logger.info(
+          `🎯 MILESTONE: ${username} reached ${currentMilestone} deaths (first time)`
+        );
+      }
+
+      // Update player death count, last life duration, and milestone
+      const updateData: Partial<Player> = {
         totalDeaths: newTotalDeaths,
         lastLifeDurationMs: lastLifeDuration,
-      });
+      };
+
+      if (isNewMilestone) {
+        updateData.highestDeathMilestone = currentMilestone;
+      }
+
+      await this.storageService.updatePlayer(username, updateData);
 
       this.logger.info(
         `Recorded death for ${username} (Total: ${newTotalDeaths}, Last life: ${this.sessionTracker.formatLastLifeDuration(
@@ -132,13 +163,21 @@ export class PlayerTracker {
         previousDeathTimestamp,
         lastLifeDurationMs: lastLifeDuration,
         timestampedEvent,
+        isNewMilestone,
+        milestoneReached,
       };
     } catch (error) {
       this.logger.error(
         `Failed to record death for ${deathEvent.username}`,
         error
       );
-      return { recorded: false, totalDeaths: 0, lastLifeDurationMs: 0 };
+      return {
+        recorded: false,
+        totalDeaths: 0,
+        lastLifeDurationMs: 0,
+        isNewMilestone: false,
+        milestoneReached: undefined,
+      };
     }
   }
 
