@@ -339,13 +339,19 @@ export class DatabaseService implements IStorageService {
         paramIndex++;
       }
 
+      if (playerData.highestDeathMilestone !== undefined) {
+        updateFields.push(`highest_death_milestone = $${paramIndex}`);
+        values.push(playerData.highestDeathMilestone);
+        paramIndex++;
+      }
+
       if (updateFields.length > 0) {
         // UPSERT: Insert new player or update existing one atomically
         const query = `
-          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, created_at)
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, highest_death_milestone, created_at)
           VALUES ($1, $${paramIndex}, $${paramIndex + 1}, $${
           paramIndex + 2
-        }, $${paramIndex + 3}, $${paramIndex + 4}, NOW())
+        }, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, NOW())
           ON CONFLICT (username) DO UPDATE SET
             ${updateFields.join(", ")}
         `;
@@ -355,7 +361,8 @@ export class DatabaseService implements IStorageService {
           playerData.onlineTimeMs ?? 0,
           playerData.lastJoin ?? null,
           playerData.lastLeave ?? null,
-          playerData.lastLifeDurationMs ?? 0
+          playerData.lastLifeDurationMs ?? 0,
+          playerData.highestDeathMilestone ?? 0
         );
 
         await client.query(query, values);
@@ -366,8 +373,8 @@ export class DatabaseService implements IStorageService {
         // Just ensure player exists if no specific updates
         const result = await client.query(
           `
-          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, created_at)
-          VALUES ($1, 0, 0, NULL, NULL, 0, NOW())
+          INSERT INTO players (username, total_deaths, online_time_ms, last_join, last_leave, last_life_duration_ms, highest_death_milestone, created_at)
+          VALUES ($1, 0, 0, NULL, NULL, 0, 0, NOW())
           ON CONFLICT (username) DO NOTHING
           RETURNING username
         `,
