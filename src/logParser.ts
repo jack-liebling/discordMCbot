@@ -1,4 +1,3 @@
-// Log parser service for reading Minecraft server logs via FTP
 import FtpClient = require("ftp");
 import { FtpConfig, DeathEvent, IStorageService } from "./types";
 import { Logger } from "./logger";
@@ -17,9 +16,9 @@ export class LogParserService {
   private onLeaveCallback:
     | ((username: string, timestamp: Date) => void)
     | null = null;
-  private recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
-  private recentJoinEvents: Set<string> = new Set(); // Cache to prevent duplicate JOIN processing
-  private recentLeaveEvents: Set<string> = new Set(); // Cache to prevent duplicate LEAVE processing
+  private readonly recentDeathEvents: Set<string> = new Set(); // Cache to prevent duplicate processing
+  private readonly recentJoinEvents: Set<string> = new Set(); // Cache to prevent duplicate JOIN processing
+  private readonly recentLeaveEvents: Set<string> = new Set(); // Cache to prevent duplicate LEAVE processing
   private readonly startupTime: Date;
   private readonly skipOldEvents: boolean = false;
 
@@ -27,6 +26,10 @@ export class LogParserService {
     this.ftpConfig = ftpConfig;
     this.storageService = storageService;
     this.startupTime = new Date();
+  }
+
+  private logReconnectError(error_: any) {
+    this.logger.error("Failed to reconnect after permissions error", error_);
   }
 
   enableSkipOldEvents(): void {
@@ -43,6 +46,16 @@ export class LogParserService {
     return new Promise((resolve, reject) => {
       this.ftpClient = new FtpClient();
       const client = this.ftpClient;
+
+      // Verbose logging for connection config
+      this.logger.info("Connecting to FTP server with config:", {
+        host: this.ftpConfig.host,
+        port: this.ftpConfig.port,
+        user: this.ftpConfig.user,
+        connTimeout: 20000,
+        pasvTimeout: 20000,
+        keepalive: 10000,
+      });
 
       client.on("ready", () => {
         this.logger.info(`FTP connected to ${this.ftpConfig.host}`);
@@ -74,6 +87,9 @@ export class LogParserService {
         port: this.ftpConfig.port,
         user: this.ftpConfig.user,
         password: this.ftpConfig.password,
+        connTimeout: 20000,
+        pasvTimeout: 20000,
+        keepalive: 10000,
       });
     });
   }
@@ -161,26 +177,83 @@ export class LogParserService {
         reject(new Error("FTP client not connected"));
         return;
       }
-
-      this.ftpClient.get(this.ftpConfig.logPath, (err: any, stream: any) => {
-        if (err) {
+      const maxRetries = 3;
+      let attempt = 0;
+      const reconnectFtp = () => {
+        this.disconnect();
+        setTimeout(() => {
+          this.connect().catch(this.logReconnectError);
+        }, 5000);
+      };
+      const handleFtpError = (err: any) => {
+        this.logger.error("FTP download error details", {
+          errorMessage: err?.message || String(err),
+          errorCode: err?.code,
+          logPath: this.ftpConfig.logPath,
+          ftpHost: this.ftpConfig.host,
+          ftpUser: this.ftpConfig.user,
+          attempt,
+        });
+        if (err?.message?.includes("privileges")) {
+          this.logger.warn(
+            "Permissions error detected - attempting reconnection"
+          );
+          reconnectFtp();
           reject(new Error(`FTP download error: ${err.message || err}`));
+          return true;
+        }
+        if (err?.message?.toLowerCase().includes("timed out")) {
+          this.logger.warn("FTP timeout detected - will retry");
+          if (attempt < maxRetries) {
+            setTimeout(tryDownload, 3000);
+            return true;
+          } else {
+            this.logger.error("Max FTP download retries reached");
+            reject(new Error(`FTP download error: ${err.message || err}`));
+            return true;
+          }
+        }
+        // Not handled specially, just log and reject
+        reject(new Error(`FTP download error: ${err.message || err}`));
+        return false;
+      };
+      const handleStream = (stream: any) => {
+        if (!stream) {
+          this.logger.error("FTP stream is undefined", {
+            logPath: this.ftpConfig.logPath,
+            attempt,
+          });
+          reject(new Error("FTP stream is undefined"));
           return;
         }
-
         let data = "";
         stream.on("data", (chunk: any) => {
           data += chunk.toString();
         });
-
         stream.on("end", () => {
           resolve(data);
         });
-
         stream.on("error", (error: any) => {
-          reject(new Error(`Stream error: ${error.message || error}`));
+          this.logger.error("FTP stream error", {
+            errorMessage: error?.message || String(error),
+            errorCode: error?.code,
+            attempt,
+          });
+          reject(new Error(`Stream error: ${error?.message || error}`));
         });
-      });
+      };
+      const tryDownload = () => {
+        attempt++;
+        this.logger.info(`FTP log download attempt ${attempt}`);
+        this.ftpClient?.get(this.ftpConfig.logPath, (err: any, stream: any) => {
+          if (err) {
+            if (handleFtpError(err)) return;
+          } else {
+            handleStream(stream);
+          }
+        });
+      };
+      tryDownload();
     });
   }
 
@@ -207,16 +280,14 @@ export class LogParserService {
               );
               resolve(size);
             })
-            .catch((downloadErr) => {
+            .catch((error_) => {
               this.logger.error(
                 "Both SIZE command and download fallback failed",
-                downloadErr
+                error_
               );
               reject(
                 new Error(
-                  `Failed to get log file size: ${
-                    downloadErr.message || downloadErr
-                  }`
+                  `Failed to get log file size: ${error_?.message || error_}`
                 )
               );
             });
@@ -259,184 +330,135 @@ export class LogParserService {
     );
 
     for (const line of lines) {
-      // Log each line being processed for death detection
       this.logger.debug(`🔍 Analyzing log line: "${line}"`);
-
-      const deathEvent = this.parseDeathMessage(line);
-      if (deathEvent) {
-        // Create a unique key for this death event to prevent duplicates
-        // Include timestamp to allow multiple deaths with same cause
-        const deathKey = `${deathEvent.username}-${
-          deathEvent.cause
-        }-${deathEvent.timestamp.getTime()}`;
-
-        this.logger.debug(`💀 Death event detected - Key: ${deathKey}`);
-        this.logger.debug(
-          `💀 Death details: Player="${deathEvent.username}", Cause="${
-            deathEvent.cause
-          }", Timestamp="${deathEvent.timestamp.toISOString()}"`
-        );
-
-        if (this.recentDeathEvents.has(deathKey)) {
-          this.logger.debug(`🔄 Skipping duplicate death event: ${deathKey}`);
-          continue;
-        }
-
-        // Add to cache and clean old entries (keep last 100 events)
-        this.recentDeathEvents.add(deathKey);
-        if (this.recentDeathEvents.size > 100) {
-          const keys = Array.from(this.recentDeathEvents);
-          this.recentDeathEvents.delete(keys[0]);
-          this.logger.debug(`🧹 Cleaned oldest death cache entry: ${keys[0]}`);
-        }
-
-        this.logger.debug(
-          `✅ Processing death event: ${deathEvent.username} - ${
-            deathEvent.cause
-          } at ${deathEvent.timestamp.toISOString()}`
-        );
-
-        this.logger.info(
-          `💀 DEATH: ${deathEvent.username} ${deathEvent.cause} [Cache size: ${this.recentDeathEvents.size}]`
-        );
-
-        this.onDeathCallback!(deathEvent);
-      } else {
-        const joinEvent = this.parseJoinMessage(line);
-        if (joinEvent && this.onJoinCallback) {
-          this.logger.info(
-            `Parsed join from log: ${
-              joinEvent.username
-            } at ${joinEvent.timestamp.toISOString()}`
-          );
-          this.onJoinCallback(joinEvent.username, joinEvent.timestamp);
-        } else {
-          const leaveEvent = this.parseLeaveMessage(line);
-          if (leaveEvent && this.onLeaveCallback) {
-            this.logger.info(
-              `Parsed leave from log: ${
-                leaveEvent.username
-              } at ${leaveEvent.timestamp.toISOString()}`
-            );
-            this.onLeaveCallback(leaveEvent.username, leaveEvent.timestamp);
-          }
-        }
-      }
+      if (this.handleDeathEvent(line)) continue;
+      if (this.handleJoinEvent(line)) continue;
+      this.handleLeaveEvent(line);
     }
   }
 
-  private parseDeathMessage(logLine: string): DeathEvent | null {
-    // Minecraft death messages in logs look like:
-    // [19:45:30] [Server thread/INFO]: Player fell from a high place
-    // [19:45:30] [Server thread/INFO]: Player was slain by Zombie
-    // [19:45:30] [Server thread/INFO]: Player drowned
+  private handleDeathEvent(line: string): boolean {
+    const deathEvent = this.parseDeathMessage(line);
+    if (!deathEvent) return false;
+    const deathKey = `${deathEvent.username}-${
+      deathEvent.cause
+    }-${deathEvent.timestamp.getTime()}`;
+    this.logger.debug(`💀 Death event detected - Key: ${deathKey}`);
+    this.logger.debug(
+      `💀 Death details: Player="${deathEvent.username}", Cause="${
+        deathEvent.cause
+      }", Timestamp="${deathEvent.timestamp.toISOString()}"`
+    );
+    if (this.recentDeathEvents.has(deathKey)) {
+      this.logger.debug(`🔄 Skipping duplicate death event: ${deathKey}`);
+      return true;
+    }
+    this.recentDeathEvents.add(deathKey);
+    if (this.recentDeathEvents.size > 100) {
+      const keys = Array.from(this.recentDeathEvents);
+      this.recentDeathEvents.delete(keys[0]);
+      this.logger.debug(`🧹 Cleaned oldest death cache entry: ${keys[0]}`);
+    }
+    this.logger.debug(
+      `✅ Processing death event: ${deathEvent.username} - ${
+        deathEvent.cause
+      } at ${deathEvent.timestamp.toISOString()}`
+    );
+    this.logger.info(
+      `💀 DEATH: ${deathEvent.username} ${deathEvent.cause} [Cache size: ${this.recentDeathEvents.size}]`
+    );
+    if (this.onDeathCallback) this.onDeathCallback(deathEvent);
+    return true;
+  }
 
-    // Extract timestamp pattern to validate this is a timestamped log line
-    const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
-    const timestampMatch = timestampPattern.exec(logLine);
-    if (!timestampMatch) {
+  private handleJoinEvent(line: string): boolean {
+    const joinEvent = this.parseJoinMessage(line);
+    if (joinEvent && this.onJoinCallback) {
+      this.logger.info(
+        `Parsed join from log: ${
+          joinEvent.username
+        } at ${joinEvent.timestamp.toISOString()}`
+      );
+      this.onJoinCallback(joinEvent.username, joinEvent.timestamp);
+      return true;
+    }
+    return false;
+  }
+
+  private handleLeaveEvent(line: string): boolean {
+    const leaveEvent = this.parseLeaveMessage(line);
+    if (leaveEvent && this.onLeaveCallback) {
+      this.logger.info(
+        `Parsed leave from log: ${
+          leaveEvent.username
+        } at ${leaveEvent.timestamp.toISOString()}`
+      );
+      this.onLeaveCallback(leaveEvent.username, leaveEvent.timestamp);
+      return true;
+    }
+    return false;
+  }
+
+  private parseDeathMessage(logLine: string): DeathEvent | null {
+    if (!this.hasValidTimestamp(logLine)) {
       this.logger.debug(`⏰ No timestamp found in line: "${logLine}"`);
       return null;
     }
-
-    // Check if this is a chat message (format: <username> message)
-    // Chat messages should be ignored as they might contain death-like text
-    const chatPattern = /<\w+>/;
-    if (chatPattern.test(logLine)) {
-      this.logger.debug(`💬 Chat message detected, ignoring: "${logLine}"`);
+    if (this.isChatOrCommandOrAction(logLine)) {
+      this.logger.debug(`Filtered non-death message: "${logLine}"`);
       return null;
     }
+    const timestamp = new Date();
+    const deathEvent = this.matchDeathPattern(logLine, timestamp);
+    if (deathEvent) {
+      this.logger.debug(
+        `� Parsed death: Player="${deathEvent.username}", Cause="${
+          deathEvent.cause
+        }", Killer="${
+          deathEvent.killerUsername || "none"
+        }", Original="${logLine}"`
+      );
+      return deathEvent;
+    }
+    this.logger.debug(`❌ No death patterns matched for line: "${logLine}"`);
+    return null;
+  }
 
-    // Check if this is a Minecraft slash command (either issued via server command or chat)
-    // Commands can appear as:
-    // [timestamp] [Server thread/INFO]: PlayerName issued server command: /command args
-    // [timestamp] [Async Chat Thread/INFO]: <PlayerName> /command args
+  private hasValidTimestamp(logLine: string): boolean {
+    const timestampPattern = /^\[(\d{2}:\d{2}:\d{2})\]/;
+    return !!timestampPattern.exec(logLine);
+  }
+
+  private isChatOrCommandOrAction(logLine: string): boolean {
+    const chatPattern = /<\w+>/;
     const serverCommandPattern = /issued server command:\s*\//;
     const chatCommandPattern = /<\w+>\s*\//;
-    if (
-      serverCommandPattern.test(logLine) ||
-      chatCommandPattern.test(logLine)
-    ) {
-      this.logger.debug(
-        `⚡ Minecraft command detected, ignoring: "${logLine}"`
-      );
-      return null;
-    }
-
-    // Check if this is an action message (emote) from /me command
-    // Action messages appear as: [timestamp] [Async Chat Thread/INFO]: * PlayerName action
     const actionPattern = /\[Async Chat Thread[^\]]*\]:\s*\*\s*\w+/;
-    if (actionPattern.test(logLine)) {
-      this.logger.debug(
-        `🎭 Action message (emote) detected, ignoring: "${logLine}"`
-      );
-      return null;
-    }
-
-    this.logger.debug(
-      `⏰ Timestamp found: ${timestampMatch[1]} in line: "${logLine}"`
+    return (
+      chatPattern.test(logLine) ||
+      serverCommandPattern.test(logLine) ||
+      chatCommandPattern.test(logLine) ||
+      actionPattern.test(logLine)
     );
+  }
 
-    // Use current time when processing the log entry
-    // This represents when the server actually wrote this log entry
-    const timestamp = new Date();
-
-    // Use imported death patterns
-    this.logger.debug(
-      `🔎 Testing ${DEATH_PATTERNS.length} death patterns against: "${logLine}"`
-    );
-
-    for (let i = 0; i < DEATH_PATTERNS.length; i++) {
-      const pattern = DEATH_PATTERNS[i];
+  private matchDeathPattern(
+    logLine: string,
+    timestamp: Date
+  ): DeathEvent | null {
+    for (const pattern of DEATH_PATTERNS) {
       const match = pattern.exec(logLine);
       if (match) {
-        this.logger.debug(
-          `✅ Pattern ${i + 1} matched: ${pattern.source} -> Player: "${
-            match[1]
-          }"`
-        );
-
         const playerId = match[1];
-        let cause = match[0].substring(playerId.length + 1); // Remove player name and space
-        let killerUsername: string | undefined;
-
-        // Check if this is a PvP kill by examining capture groups
-        // Handle patterns with "using weapon" vs simple killer patterns
-        if (match[2]) {
-          let potentialKiller = match[2].trim();
-
-          // For patterns like "was slain by Player using Sword", the killer is still in match[2]
-          // We need to extract just the killer name without the weapon part
-          if (potentialKiller.includes(" using ")) {
-            potentialKiller = potentialKiller.split(" using ")[0].trim();
-          }
-
-          if (this.isPlayerUsername(potentialKiller)) {
-            killerUsername = potentialKiller;
-            this.logger.info(
-              `🗡️ PvP KILL DETECTED: ${killerUsername} killed ${playerId}`
-            );
-          }
-        }
-
-        // Clean up the cause message
-        if (
-          cause.startsWith("was ") ||
-          cause.startsWith("fell ") ||
-          cause.startsWith("drowned") ||
-          cause.startsWith("suffocated")
-        ) {
-          // Keep these messages as they are
-        } else {
-          cause = cause || "died of mysterious causes";
-        }
-
-        this.logger.debug(
-          `💀 Parsed death: Player="${playerId}", Cause="${cause}", Killer="${
-            killerUsername || "none"
-          }", Original="${match[0]}"`
+        const cause = this.cleanDeathCause(
+          match[0].substring(playerId.length + 1)
         );
-
+        const killerUsername = this.extractKiller(match[2]);
+        if (killerUsername) {
+          this.logger.info(
+            `🗡️ PvP KILL DETECTED: ${killerUsername} killed ${playerId}`
+          );
+        }
         return {
           username: playerId,
           timestamp,
@@ -445,9 +467,28 @@ export class LogParserService {
         };
       }
     }
-
-    this.logger.debug(`❌ No death patterns matched for line: "${logLine}"`);
     return null;
+  }
+
+  private extractKiller(rawKiller: string | undefined): string | undefined {
+    if (!rawKiller) return undefined;
+    let potentialKiller = rawKiller.trim();
+    if (potentialKiller.includes(" using ")) {
+      potentialKiller = potentialKiller.split(" using ")[0].trim();
+    }
+    return this.isPlayerUsername(potentialKiller) ? potentialKiller : undefined;
+  }
+
+  private cleanDeathCause(cause: string): string {
+    if (
+      cause.startsWith("was ") ||
+      cause.startsWith("fell ") ||
+      cause.startsWith("drowned") ||
+      cause.startsWith("suffocated")
+    ) {
+      return cause;
+    }
+    return cause || "died of mysterious causes";
   }
 
   /**
@@ -551,7 +592,7 @@ export class LogParserService {
     }
 
     // Basic player username pattern: 3-16 chars, must start with a letter, alphanumeric + underscore
-    const playerPattern = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
+    const playerPattern = /^[a-zA-Z]\w{2,15}$/;
     return playerPattern.test(cleanName);
   }
 
